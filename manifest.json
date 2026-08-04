@@ -1,0 +1,13 @@
+{
+  "name": "Finanzas Tracto",
+  "short_name": "FinTracto",
+  "description": "Gestor bancario móvil",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F5C200",
+  "theme_color": "#185FA5",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

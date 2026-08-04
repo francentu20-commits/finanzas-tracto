@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#F5C200"/>
+  <circle cx="145" cy="330" r="90" fill="#1a1a1a"/>
+  <circle cx="145" cy="330" r="50" fill="#eee"/>
+  <circle cx="145" cy="330" r="22" fill="#1a1a1a"/>
+  <circle cx="355" cy="345" r="55" fill="#1a1a1a"/>
+  <circle cx="355" cy="345" r="28" fill="#eee"/>
+  <rect x="110" y="180" width="290" height="120" rx="18" fill="#1a1a1a"/>
+  <rect x="270" y="110" width="130" height="100" rx="18" fill="#1a1a1a"/>
+  <rect x="278" y="118" width="114" height="76" rx="10" fill="#a8d8f0" opacity=".85"/>
+  <rect x="60" y="220" width="55" height="44" rx="8" fill="#1a1a1a"/>
+  <text x="256" y="460" font-family="Arial Black" font-size="80" font-weight="900" fill="#CC0000" text-anchor="middle">Tracto</text>
+</svg>

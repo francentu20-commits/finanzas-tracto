@@ -1,0 +1,1581 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#185FA5">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Finanzas Tracto</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-sync.js"></script>
+<style>
+:root{
+  --bg:#f4f6f9;--bg2:#fff;--bd:#e2e8f0;--tx:#1a202c;--tx2:#64748b;--tx3:#94a3b8;
+  --blue:#185FA5;--bl:#E6F1FB;--green:#1D9E75;--gl:#EAF3DE;
+  --red:#D85A30;--rl:#FCEBEB;--amber:#854F0B;--al:#FAEEDA;
+  --yellow:#F5C200;--r:12px;--f:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;height:100dvh;display:flex;flex-direction:column}
+/* TOPBAR */
+.topbar{background:var(--blue);color:#fff;padding:12px 16px calc(12px + env(safe-area-inset-top,0px));padding-top:calc(12px + env(safe-area-inset-top,0px));display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,.2);flex-shrink:0}
+.app-title{font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
+.emp-tag{font-size:11px;background:rgba(255,255,255,.2);padding:3px 10px;border-radius:999px;font-weight:600}
+.emp-switch{background:rgba(255,255,255,.15);border:none;color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--f)}
+/* CONTENT */
+.content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(70px + var(--safe-bottom))}
+.page{display:none;padding:12px 14px}.page.active{display:block}
+/* BOTTOM NAV */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--bd);display:flex;padding-bottom:var(--safe-bottom);z-index:100;box-shadow:0 -2px 12px rgba(0,0,0,.08)}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 4px 8px;border:none;background:none;color:var(--tx2);cursor:pointer;font-family:var(--f);gap:3px;transition:color .15s}
+.nav-btn i{font-size:22px}
+.nav-btn span{font-size:10px;font-weight:600}
+.nav-btn.active{color:var(--blue)}
+.nav-btn.active i{transform:scale(1.1)}
+/* CARDS */
+.card{background:var(--bg2);border-radius:var(--r);padding:14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.card-title{font-size:14px;font-weight:700;color:var(--tx);margin-bottom:10px}
+/* METRICS ROW */
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.metric{background:var(--bg2);border-radius:var(--r);padding:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);text-align:center}
+.ml{font-size:10px;color:var(--tx2);font-weight:600;margin-bottom:2px}
+.mv{font-size:20px;font-weight:800;color:var(--tx)}
+/* PROGRESS BAR */
+.pbar{height:6px;background:var(--bd);border-radius:3px;margin-bottom:14px;overflow:hidden}
+.pfill{height:6px;border-radius:3px;background:var(--blue);transition:width .4s}
+/* TASK ITEMS */
+.task-item{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid var(--bd)}
+.task-item:last-child{border-bottom:none}
+.task-check{width:22px;height:22px;min-width:22px;border-radius:6px;border:2px solid var(--bd);display:flex;align-items:center;justify-content:center;cursor:pointer;margin-top:1px;background:var(--bg2);transition:all .15s}
+.task-check.done{background:var(--green);border-color:var(--green);color:#fff}
+.task-body{flex:1;min-width:0}
+.task-txt{font-size:14px;color:var(--tx);line-height:1.4;font-weight:500}
+.task-txt.done{text-decoration:line-through;color:var(--tx2)}
+.task-meta{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700}
+.tag-dep{background:var(--gl);color:var(--green)}
+.tag-ret{background:var(--rl);color:#A32D2D}
+.tag-gen{background:var(--bl);color:var(--blue)}
+.tag-gs{background:var(--al);color:var(--amber)}
+.tag-usd{background:var(--bl);color:var(--blue)}
+/* PHASE BUTTONS */
+.phase-btns{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.phase-btn{flex:1;min-width:0;padding:9px 6px;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--f);display:flex;align-items:center;justify-content:center;gap:4px;transition:all .15s;white-space:nowrap}
+.phase-btn:active{transform:scale(.97)}
+.pb-iniciar{background:var(--al);color:var(--amber)}
+.pb-banco{background:var(--bl);color:var(--blue)}
+.pb-terminar{background:var(--gl);color:var(--green)}
+/* CRONO */
+.crono-strip{display:flex;align-items:center;gap:8px;background:var(--bl);border-radius:10px;padding:8px 12px;margin-top:6px}
+.crono-lbl{font-size:11px;color:var(--tx2);font-weight:600}
+.crono-val{font-size:18px;font-weight:800;font-family:monospace;color:var(--blue)}
+.crono-final{display:flex;align-items:center;gap:8px;background:var(--gl);border-radius:10px;padding:8px 12px;margin-top:6px;font-size:12px;font-weight:700;color:var(--green)}
+/* FAB */
+.fab{position:fixed;bottom:calc(80px + var(--safe-bottom));right:16px;width:54px;height:54px;border-radius:50%;background:var(--blue);color:#fff;border:none;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(24,95,165,.4);cursor:pointer;z-index:99;transition:transform .15s}
+.fab:active{transform:scale(.93)}
+/* FORMS */
+.fgrp{margin-bottom:10px}
+.flabel{font-size:12px;color:var(--tx2);font-weight:600;display:block;margin-bottom:4px}
+.fi{width:100%;padding:11px 13px;font-size:15px;border:1.5px solid var(--bd);border-radius:10px;background:var(--bg2);color:var(--tx);font-family:var(--f);-webkit-appearance:none}
+.fi:focus{outline:none;border-color:var(--blue)}
+.seg{display:flex;border:1.5px solid var(--bd);border-radius:10px;overflow:hidden}
+.seg-opt{flex:1;padding:10px 4px;text-align:center;cursor:pointer;color:var(--tx2);background:var(--bg2);border:none;font-family:var(--f);font-size:13px;font-weight:600;transition:all .1s}
+.seg-opt.on{background:var(--bl);color:var(--blue)}
+.seg-opt.on-g{background:var(--gl);color:var(--green)}
+.seg-opt.on-r{background:var(--rl);color:#A32D2D}
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-end;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border-radius:20px 20px 0 0;padding:20px 16px calc(20px + var(--safe-bottom));width:100%;max-height:92dvh;overflow-y:auto}
+.modal-handle{width:40px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 16px}
+.modal-title{font-size:17px;font-weight:800;color:var(--tx);margin-bottom:14px}
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:13px;font-size:15px;font-weight:700;border:none;border-radius:12px;cursor:pointer;font-family:var(--f);transition:all .15s}
+.btn:active{transform:scale(.98)}
+.btn-p{background:var(--blue);color:#fff}
+.btn-s{background:var(--green);color:#fff}
+.btn-cancel{background:var(--bg);color:var(--tx2);margin-top:8px}
+/* DIVIDER */
+.sec-label{font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;padding:12px 0 6px}
+/* OCR */
+.drop-zone{border:2px dashed var(--bd);border-radius:var(--r);padding:28px 16px;text-align:center;cursor:pointer;color:var(--tx2);transition:all .15s}
+.drop-zone.over,.drop-zone:active{border-color:var(--blue);background:var(--bl)}
+.ocr-result{background:var(--bg);border-radius:10px;padding:12px;margin-top:10px;font-size:13px;color:var(--tx)}
+.ocr-field{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd);font-size:13px}
+.ocr-field:last-child{border-bottom:none}
+.ocr-field-lbl{color:var(--tx2);font-weight:600}
+.ocr-field-val{font-weight:700;color:var(--tx);text-align:right;flex:1;margin-left:8px}
+.spin{display:inline-block;width:18px;height:18px;border:2px solid var(--bd);border-top-color:var(--blue);border-radius:50%;animation:sp .8s linear infinite;vertical-align:middle}
+@keyframes sp{to{transform:rotate(360deg)}}
+/* CUENTAS */
+.banco-card{background:var(--bg2);border-radius:var(--r);padding:13px 14px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-left:4px solid var(--blue)}
+.banco-name{font-size:15px;font-weight:700;color:var(--tx);margin-bottom:6px}
+.cta-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0}
+.cta-mon{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+.cta-gs{background:var(--al);color:var(--amber)}
+.cta-usd{background:var(--bl);color:var(--blue)}
+.cta-num{font-size:12px;font-family:monospace;color:var(--tx2)}
+/* ACUSE */
+.acuse-zone{border:2px dashed var(--green);border-radius:var(--r);padding:20px;text-align:center;cursor:pointer;color:var(--green);background:var(--gl)}
+/* TOAST */
+.toast{position:fixed;top:calc(60px + env(safe-area-inset-top,0px));left:12px;right:12px;z-index:999;background:var(--tx);color:#fff;border-radius:12px;padding:13px 16px;font-size:14px;font-weight:600;display:none;animation:toastIn .25s ease;box-shadow:0 4px 16px rgba(0,0,0,.25)}
+@keyframes toastIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="app-title">
+    <svg width="26" height="26" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#F5C200"/><circle cx="145" cy="330" r="90" fill="#1a1a1a"/><circle cx="145" cy="330" r="50" fill="#eee"/><circle cx="145" cy="330" r="22" fill="#1a1a1a"/><circle cx="355" cy="345" r="55" fill="#1a1a1a"/><circle cx="355" cy="345" r="28" fill="#eee"/><rect x="110" y="180" width="290" height="120" rx="18" fill="#1a1a1a"/><rect x="270" y="110" width="130" height="100" rx="18" fill="#1a1a1a"/><rect x="278" y="118" width="114" height="76" rx="10" fill="#a8d8f0" opacity=".85"/></svg>
+    Finanzas Tracto
+  </div>
+  <button class="emp-switch" onclick="toggleEmp()" id="emp-btn">Tracto</button>
+</div>
+
+<div class="content">
+
+<!-- JOURNAL -->
+<div id="page-jour" class="page active">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <div>
+      <div style="font-size:16px;font-weight:800" id="j-fecha-mob"></div>
+      <div style="font-size:11px;color:var(--tx2)" id="j-emp-sub"></div>
+    </div>
+    <div style="font-size:12px;color:var(--blue);font-weight:700" id="j-pct-mob">0%</div>
+  </div>
+  <div class="pbar"><div class="pfill" id="j-bar-mob" style="width:0%"></div></div>
+  <div class="metrics">
+    <div class="metric"><div class="ml">Completadas</div><div class="mv" style="color:var(--green)" id="jm-don">0</div></div>
+    <div class="metric"><div class="ml">Pendientes</div><div class="mv" style="color:#A32D2D" id="jm-pen">0</div></div>
+    <div class="metric"><div class="ml">Dep. hoy</div><div class="mv" style="color:var(--green);font-size:14px" id="jm-dep">0</div></div>
+    <div class="metric"><div class="ml">Ret. hoy</div><div class="mv" style="color:#A32D2D;font-size:14px" id="jm-ret">0</div></div>
+  </div>
+  <div class="card" style="padding:14px 14px 6px">
+    <!-- Las completadas van arriba de todo, sin importar la prioridad, en el
+         orden en que se fueron terminando. Abajo, lo que falta hacer. -->
+    <div id="j-hechas-mob"></div>
+    <div id="j-alta-mob"></div>
+    <div id="j-media-mob"></div>
+    <div id="j-baja-mob"></div>
+    <div id="j-empty-mob" style="text-align:center;padding:24px 0;color:var(--tx2);display:none">
+      <i class="ti ti-notebook" style="font-size:40px;display:block;opacity:.3;margin-bottom:8px"></i>
+      Sin tareas. Tocá + para agregar.
+    </div>
+  </div>
+  <div class="card" id="oficina-card-mob">
+    <div class="card-title">🏢 De vuelta a la oficina</div>
+    <div id="oficina-pre-mob">
+      <input class="fi" id="oficina-lugar-mob" placeholder="¿Dónde estás? (opcional)" style="margin-bottom:8px">
+      <button class="btn btn-p" onclick="oficinaIniciarMob()">▶ Iniciar</button>
+    </div>
+    <div id="oficina-activo-mob" style="display:none">
+      <div style="font-size:12px;color:var(--tx2);margin-bottom:6px" id="oficina-lugar-txt-mob"></div>
+      <div class="crono-strip"><span class="crono-lbl">🏢 Volviendo</span><span class="crono-val" id="oficina-crono-mob">00:00</span></div>
+      <div class="phase-btns"><button class="phase-btn pb-terminar" onclick="oficinaTerminarMob()">✅ Llegué a la oficina</button></div>
+    </div>
+    <div id="oficina-hist-mob"></div>
+  </div>
+  <div class="card" id="jm-manana-card" style="display:none">
+    <div class="card-title" style="color:var(--amber)">⏭ Para mañana</div>
+    <div id="jm-manana"></div>
+  </div>
+  <!-- "Notas del día" se quitó: ahora el comentario va en cada tarea
+       (campo Observación del formulario de Nueva tarea, que en el celular se
+       ve como el botón 📝 de cada tarea). -->
+</div>
+
+<!-- ESCÁNER -->
+<div id="page-scan" class="page">
+  <div style="font-size:18px;font-weight:800;margin-bottom:14px">Escáner de cheques</div>
+  <div class="seg" id="mseg-scanmode" style="margin-bottom:12px">
+    <button class="seg-opt on-g" onclick="setScanMode('deposito',this)">🟢 Depósito</button>
+    <button class="seg-opt" onclick="setScanMode('descuento',this)">🔵 Descuento</button>
+  </div>
+  <div class="card">
+    <div class="drop-zone" id="mob-drop" onclick="document.getElementById('mob-scan-inp').click()">
+      <i class="ti ti-camera-up" style="font-size:40px;display:block;margin-bottom:8px"></i>
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">Tocá para fotografiar</div>
+      <div style="font-size:12px">o seleccioná imagen de galería</div>
+    </div>
+    <input type="file" id="mob-scan-inp" accept="image/*" capture="environment" style="display:none" onchange="mobHandleFile(event)">
+    <div id="mob-scan-prev" style="display:none;margin-top:12px">
+      <img id="mob-scan-img" style="width:100%;max-height:200px;object-fit:contain;border-radius:10px;border:1px solid var(--bd)" alt="">
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-p" style="flex:2" onclick="mobEscanear()"><i class="ti ti-scan"></i> Leer cheque</button>
+        <button class="btn btn-cancel" style="flex:1;margin:0" onclick="mobResetScan()">Limpiar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="depo-list-card" style="display:none">
+    <div class="card-title">Depósitos guardados (<span id="depo-count">0</span>)</div>
+    <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">Se sincronizan solos con la PC. La exportación a Excel se hace desde ahí.</div>
+    <div id="depo-lista"></div>
+  </div>
+  <div class="card" id="desc-list-card" style="display:none">
+    <div class="card-title">Descuentos guardados (<span id="desc-count">0</span>)</div>
+    <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">Se sincronizan solos con la PC. La exportación a Excel se hace desde ahí.</div>
+    <div id="desc-lista"></div>
+  </div>
+
+  <div id="mob-scan-resultado" style="display:none">
+    <div class="card">
+      <div class="card-title">
+        Datos extraídos
+        <span id="mob-spin" style="display:none"><span class="spin"></span></span>
+      </div>
+      <div id="mob-ocr-fields"></div>
+      <div style="text-align:center;margin-top:2px">
+        <span style="font-size:11px;color:var(--tx2);text-decoration:underline;cursor:pointer" onclick="toggleOcrDebug()">Ver texto sin procesar (debug)</span>
+      </div>
+      <div id="mob-ocr-raw" style="display:none;font-size:11px;color:var(--tx2);margin-top:8px;max-height:160px;overflow-y:auto;background:var(--bg);border-radius:8px;padding:8px;font-family:monospace;white-space:pre-wrap"></div>
+    </div>
+    <!-- Acreditación (Depósito) -->
+    <div class="card" id="scan-deposito-save">
+      <div class="card-title">Guardar cheque</div>
+      <div style="display:flex;gap:8px">
+        <div class="fgrp" style="flex:1"><span class="flabel">N° de cheque</span><input class="fi" id="dep-nch"></div>
+        <div class="fgrp" style="flex:1"><span class="flabel">Banco cheque</span><input class="fi" id="dep-banco"></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div class="fgrp" style="flex:2"><span class="flabel">Importe</span><input class="fi" id="dep-importe" inputmode="decimal"></div>
+        <div class="fgrp" style="flex:1"><span class="flabel">Moneda</span><select class="fi" id="dep-moneda"><option value="GS">GS</option><option value="USD">USD</option></select></div>
+      </div>
+      <div class="fgrp"><span class="flabel">Fecha</span><input class="fi" type="date" id="mob-fecha-acred"></div>
+      <button class="btn btn-s" onclick="mobGuardarCheque()" style="margin-top:4px"><i class="ti ti-device-floppy"></i> Guardar cheque</button>
+    </div>
+    <!-- Descuento -->
+    <div class="card" id="scan-descuento-save" style="display:none">
+      <div class="card-title">Guardar descuento</div>
+      <div class="fgrp"><span class="flabel">Banco (código)</span><input class="fi" id="desc-banco" placeholder="Ej: 17" inputmode="numeric"></div>
+      <div style="display:flex;gap:8px">
+        <div class="fgrp" style="flex:1"><span class="flabel">Tipo</span><select class="fi" id="desc-tipo"><option value="DIFERIDO">Diferido</option><option value="VISTA">Vista</option></select></div>
+        <div class="fgrp" style="flex:1"><span class="flabel">Moneda</span><select class="fi" id="desc-moneda"><option value="PYG">PYG</option><option value="USD">USD</option></select></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div class="fgrp" style="flex:1"><span class="flabel">N° cheque</span><input class="fi" id="desc-nrochq"></div>
+        <div class="fgrp" style="flex:1">
+          <span class="flabel">Serie</span>
+          <input class="fi" id="desc-serie">
+          <div id="desc-serie-zoom-btn" style="display:none;text-align:right;margin-top:4px">
+            <span style="font-size:11px;color:var(--blue);text-decoration:underline;cursor:pointer" onclick="mobZoomSerie()">🔍 Reintentar con zoom</span>
+          </div>
+        </div>
+      </div>
+      <div class="fgrp"><span class="flabel">Número de cuenta</span><input class="fi" id="desc-ctacte"></div>
+      <div style="display:flex;gap:8px">
+        <div class="fgrp" style="flex:2"><span class="flabel">Documento (CI/RUC)</span><input class="fi" id="desc-documento" inputmode="numeric"></div>
+        <div class="fgrp" style="flex:1"><span class="flabel">Tipo doc.</span><input class="fi" id="desc-tipodoc" placeholder="C.I"></div>
+      </div>
+      <div class="fgrp"><span class="flabel">Cliente</span><input class="fi" id="desc-cliente"></div>
+      <div class="fgrp"><span class="flabel">Importe</span><input class="fi" id="desc-importe" inputmode="decimal"></div>
+      <div style="display:flex;gap:8px">
+        <div class="fgrp" style="flex:1"><span class="flabel">Emisión</span><input class="fi" type="text" id="desc-emision" placeholder="DD/MM/AAAA"></div>
+        <div class="fgrp" style="flex:1"><span class="flabel">Vencimiento</span><input class="fi" type="text" id="desc-venc" placeholder="DD/MM/AAAA"></div>
+      </div>
+
+      <button class="btn btn-s" onclick="mobGuardarDescuento()" style="margin-top:4px"><i class="ti ti-device-floppy"></i> Guardar descuento</button>
+    </div>
+  </div>
+</div>
+
+<!-- CUENTAS -->
+<div id="page-ctas" class="page">
+  <div style="display:flex;gap:6px;margin-bottom:12px">
+    <button class="seg-opt on" id="cta-btn-t" onclick="setCuentasTab('tracto')" style="flex:1;border-radius:10px;padding:10px;border:1.5px solid var(--bd)">🚜 Tracto</button>
+    <button class="seg-opt" id="cta-btn-a" onclick="setCuentasTab('agri')" style="flex:1;border-radius:10px;padding:10px;border:1.5px solid var(--bd)">🌱 Agricultural</button>
+  </div>
+  <div id="mob-ctas-lista"></div>
+</div>
+
+<div id="page-acuses" class="page">
+  <div id="mob-acuses-lista"></div>
+</div>
+
+</div>
+
+<!-- VISOR DE ACUSE (pantalla completa) -->
+<div class="modal-overlay" id="modal-acuse-view" onclick="cerrarAcuseFull()" style="z-index:300;align-items:center">
+  <img id="acuse-view-img" style="max-width:94vw;max-height:90vh;border-radius:10px;object-fit:contain">
+</div>
+
+<!-- FAB -->
+<button class="fab" id="fab-btn" onclick="openModalTarea()" title="Nueva tarea">
+  <i class="ti ti-plus"></i>
+</button>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+  <button class="nav-btn active" id="nav-jour" onclick="showMobPage('jour',this)">
+    <i class="ti ti-notebook"></i><span>Journal</span>
+  </button>
+  <button class="nav-btn" id="nav-scan" onclick="showMobPage('scan',this)">
+    <i class="ti ti-scan"></i><span>Escáner</span>
+  </button>
+  <button class="nav-btn" id="nav-ctas" onclick="showMobPage('ctas',this)">
+    <i class="ti ti-credit-card"></i><span>Cuentas</span>
+  </button>
+  <button class="nav-btn" id="nav-acuses" onclick="showMobPage('acuses',this)">
+    <i class="ti ti-paperclip"></i><span>Acuses</span>
+  </button>
+</div>
+
+<!-- MODAL NUEVA TAREA -->
+<div class="modal-overlay" id="modal-mob-tarea">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Nueva tarea</div>
+    <div class="fgrp">
+      <div class="seg" id="mseg-tipo">
+        <button class="seg-opt" onclick="setMTipo('general',this)">⚪ General</button>
+        <button class="seg-opt on-g" onclick="setMTipo('deposito',this)">🟢 Depósito</button>
+        <button class="seg-opt on-r" onclick="setMTipo('retiro',this)">🔴 Retiro</button>
+      </div>
+    </div>
+    <!-- Tareas generales: se elige de la lista de trámites que se repiten y
+         cada uno pide sus propios datos (mismo criterio que en la PC). -->
+    <div id="mt-gen-mob" style="display:none">
+      <div class="fgrp"><span class="flabel">Tarea</span>
+        <select class="fi" id="mt-gen-tarea-mob" onchange="setGenTareaMob()">
+          <option value="pagare">📄 Retirar pagaré</option>
+          <option value="rechazado">🚫 Retirar cheque rechazado</option>
+          <option value="solicitud">📋 Entregar solicitud</option>
+          <option value="otro">✏️ Otros (escribir a mano)</option>
+        </select>
+      </div>
+    </div>
+    <div class="fgrp" id="mt-gen-dueno-box-mob" style="display:none"><span class="flabel">Dueño del pagaré</span><input class="fi" id="mt-gen-dueno-mob" placeholder="Ej: Don Artigas"></div>
+    <div class="fgrp" id="mt-gen-cant-box-mob" style="display:none"><span class="flabel">Cantidad de cheques</span><input class="fi" type="number" min="1" id="mt-gen-cant-mob" placeholder="1" inputmode="numeric"></div>
+    <div class="fgrp" id="mt-gen-solic-box-mob" style="display:none"><span class="flabel">Tipo de solicitud</span>
+      <select class="fi" id="mt-gen-solic-mob" onchange="setGenTareaMob()">
+        <option value="Préstamo">Préstamo</option>
+        <option value="otro">Otros (escribir a mano)</option>
+      </select>
+    </div>
+    <div class="fgrp" id="mt-gen-solic-otro-box-mob" style="display:none"><span class="flabel">¿Solicitud de qué?</span><input class="fi" id="mt-gen-solic-otro-mob" placeholder="Escribí el tipo de solicitud..."></div>
+    <div class="fgrp" id="mt-txt-box-mob"><span class="flabel">Descripción</span><input class="fi" id="mt-txt-mob" placeholder="Ej: Depositar cheque en Itaú..."></div>
+    <div class="fgrp"><span class="flabel">Observación <span style="font-weight:400;color:var(--tx2)">(opcional)</span></span><textarea class="fi" id="mt-obs-mob" style="min-height:56px;resize:vertical" placeholder="Comentario o aclaración de esta tarea..."></textarea></div>
+    <div class="fgrp"><span class="flabel">Prioridad</span>
+      <div class="seg" id="mseg-pri">
+        <button class="seg-opt on-r" onclick="setMPri('alta',this)">🔴 Urgente</button>
+        <button class="seg-opt" onclick="setMPri('media',this)">🟡 Media</button>
+        <button class="seg-opt" onclick="setMPri('baja',this)">🟢 Baja</button>
+      </div>
+    </div>
+    <div class="fgrp"><span class="flabel" id="mt-banco-lbl-mob">Banco</span><select class="fi" id="mt-banco-mob" onchange="mobMostrarCta()"><option value="">No aplica / entrega no bancaria</option></select></div>
+    <div id="mt-cta-mob" style="display:none" class="fgrp"><span class="flabel">N° de cuenta</span><input class="fi" id="mt-numcta-mob" readonly style="background:var(--bg);color:var(--blue);font-weight:700"></div>
+    <div id="mt-op-mob" style="display:block">
+      <div class="fgrp">
+        <div class="seg" id="mseg-mon">
+          <button class="seg-opt on" onclick="setMMon('GS',this)">Guaraníes</button>
+          <button class="seg-opt" onclick="setMMon('USD',this)">USD</button>
+        </div>
+      </div>
+      <div class="fgrp">
+        <div class="seg" id="mseg-inst">
+          <button class="seg-opt on" onclick="setMInst('efectivo',this)">💵 Efectivo</button>
+          <button class="seg-opt" onclick="setMInst('cheque',this)">🧾 Cheque</button>
+        </div>
+      </div>
+      <div class="fgrp">
+        <div class="seg" id="mseg-canal">
+          <button class="seg-opt on" onclick="setMCanal('ventanilla',this)">🏦 Ventanilla</button>
+          <button class="seg-opt" onclick="setMCanal('taucher',this)">📋 Taucher</button>
+        </div>
+      </div>
+      <div class="fgrp"><span class="flabel">Monto</span><input class="fi" type="number" id="mt-monto-mob" placeholder="0" inputmode="numeric"></div>
+      <div class="fgrp"><span class="flabel">Nombre</span><input class="fi" id="mt-nom-mob" placeholder="Depositante / beneficiario"></div>
+    </div>
+    <button class="btn btn-p" onclick="guardarTareaMob()"><i class="ti ti-check"></i> Agregar tarea</button>
+    <button class="btn btn-cancel" onclick="closeMobModal()">Cancelar</button>
+  </div>
+</div>
+
+<!-- MODAL ACUSE -->
+<div class="modal-overlay" id="modal-acuse-mob">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📎 ¿Adjuntar acuse de recibo?</div>
+    <div style="font-size:13px;color:var(--tx2);margin-bottom:14px" id="acuse-tarea-nom-mob"></div>
+    <div class="acuse-zone" id="acuse-zone-mob" onclick="document.getElementById('acuse-inp-mob').click()">
+      <i class="ti ti-camera" style="font-size:36px;display:block;margin-bottom:6px"></i>
+      <div style="font-size:14px;font-weight:700">Fotografiar comprobante</div>
+      <div style="font-size:11px;margin-top:3px">Tocá para abrir cámara o galería</div>
+    </div>
+    <input type="file" id="acuse-inp-mob" accept="image/*" capture="environment" style="display:none" onchange="acuseMobFile(event)">
+    <div id="acuse-prev-mob" style="display:none;text-align:center;margin-top:10px">
+      <img id="acuse-img-mob" style="max-width:100%;max-height:180px;border-radius:10px;border:1px solid var(--bd);object-fit:contain" alt="">
+      <div style="font-size:12px;color:var(--green);font-weight:700;margin-top:6px">✅ Foto lista para guardar</div>
+    </div>
+    <button class="btn btn-s" onclick="guardarAcuseMob()" style="margin-top:14px"><i class="ti ti-device-floppy"></i> Guardar acuse</button>
+    <button class="btn btn-cancel" onclick="omitirAcuseMob()">Omitir — continuar sin foto</button>
+  </div>
+</div>
+
+<div id="mob-toast" class="toast"></div>
+
+<script>
+// ── DATA ──
+const CTAS={tracto:[{b:"Itaú",gs:"00039779/3",usd:"05-001436/9"},{b:"Sudameris",gs:"10-1123363",usd:"10-1123363"},{b:"GNB",gs:"001-064104-001",usd:"001064104-020"},{b:"Atlas",gs:"1013000131",usd:"11013000440"},{b:"Continental",gs:"01-0369862-08",usd:"01-0792502-04"},{b:"Basa",gs:"021300061/3",usd:"10200000018"},{b:"Regional",gs:"8052709",usd:"8052709"},{b:"Visión",gs:"90008649/4",usd:"90043311/9"},{b:"Nac. Argentina",gs:"519162",usd:"519154"},{b:"Do Brasil",gs:"327786",usd:"10-327786"},{b:"Bancop",gs:"0.410010715",usd:"0.410010804"},{b:"Río",gs:"0823358800/07",usd:"0826848900/03"},{b:"Familiar",gs:"22-002079028",usd:"22-002079031"},{b:"Interfisa",gs:"50000926",usd:"60000257"},{b:"FIC",gs:"231000786",usd:"231000787"},{b:"Solar",gs:"187271",usd:"183216"}],agri:[{b:"Itaú",gs:"4.0.000205/7",usd:"4.5.000033/0"},{b:"Interfisa",gs:"5-0007171",usd:"6-0001192"},{b:"Familiar",gs:"22-002783107",usd:"22-002783084"},{b:"Bancop",gs:"410162752",usd:"410162760"},{b:"Atlas",gs:"1242626",usd:"1244647"},{b:"Regional",gs:"8065388",usd:"8065388"},{b:"Sudameris",gs:"10-3794476",usd:"10-3794476"},{b:"Visión",gs:"900614013",usd:"900614006"},{b:"Continental",gs:"12360317106",usd:"12631738701"},{b:"Río",gs:"82313482001",usd:"-"},{b:"FIC",gs:"631000756",usd:"631001318"},{b:"Basa",gs:"100132861",usd:"10100013846"}]};
+
+let tareas=JSON.parse(localStorage.getItem("ft-mob-tar")||"[]");
+let ops=JSON.parse(localStorage.getItem("ft-mob-ops")||"[]");
+let agenda=JSON.parse(localStorage.getItem("ft-mob-ag")||"[]");
+let emp="tracto";
+let nT=tareas.length?Math.max(0,...tareas.map(t=>t.id))+1:1;
+let nO=ops.length?Math.max(0,...ops.map(o=>o.id))+1:1;
+let nA=agenda.length?Math.max(0,...agenda.map(a=>a.id))+1:1;
+let cronos={};
+let mtTipo="deposito",mtMon="GS",mtInst="efectivo",mtCanal="ventanilla",mtPri="alta";
+let scanB64=null,ocrParsed={},ocrRaw="",scanMode="deposito",scanImgOrig=null;
+let descuentos=JSON.parse(localStorage.getItem("ft-mob-desc")||"[]");
+let nD=descuentos.length?Math.max(0,...descuentos.map(d=>d.id))+1:1;
+let depositos=JSON.parse(localStorage.getItem("ft-mob-depo")||"[]");
+let nDp=depositos.length?Math.max(0,...depositos.map(d=>d.id))+1:1;
+let notasJ=localStorage.getItem("ft-mob-notas")||"";
+let acuseTaskId=null,acuseB64=null,acuseAgendaId=null;
+let cuentasTab="tracto";
+// Estado de "De vuelta a la oficina" (se declara acá arriba, junto al resto
+// del estado, porque sv() lo empuja a Supabase y sv() está definido antes que
+// las funciones de la oficina).
+let oficina={activo:false,lugar:"",inicio:null,hist:[]};
+try{const guardadoOf=localStorage.getItem("ft-mob-oficina");if(guardadoOf)oficina=Object.assign(oficina,JSON.parse(guardadoOf));}catch(e){}
+
+function today(){return new Date().toISOString().split("T")[0];}
+function sv(){try{localStorage.setItem("ft-mob-tar",JSON.stringify(tareas));localStorage.setItem("ft-mob-ops",JSON.stringify(ops));localStorage.setItem("ft-mob-ag",JSON.stringify(agenda));localStorage.setItem("ft-mob-depo",JSON.stringify(depositos));localStorage.setItem("ft-mob-notas",notasJ);}catch(e){console.error("[FinTracto] localStorage lleno, se sigue igual con Supabase:",e);}if(window.FDSupabase)window.FDSupabase.pushAll({tareas,ops,agenda,descuentos,depositos,notasJ,oficina});}
+// notasJ ya no tiene interfaz (se quitó "Notas del día"). Se conserva la
+// variable porque sigue sincronizándose con la PC y con días ya archivados.
+function fN(n){return new Intl.NumberFormat("es-PY").format(Math.round(n));}
+function fM(n,m){return m==="USD"?"$"+Number(n).toFixed(2):"Gs."+fN(n);}
+function fmtT(ms){if(!ms)return"00:00";const s=Math.floor(ms/1000),m=Math.floor(s/60),h=Math.floor(m/60);if(h>0)return h+"h "+String(m%60).padStart(2,"0")+"m";return String(m).padStart(2,"0")+":"+String(s%60).padStart(2,"0");}
+// ── TIEMPOS: helpers ──
+// parseT() vuelve a milisegundos el texto que escribe fmtT ("07:32", "1h 05m").
+// Hace falta para las tareas guardadas por versiones anteriores, que solo
+// tienen los textos tCalle/tBanco y no los milisegundos: sin esto el "Total"
+// de esos registros salía 00:00.
+function parseT(txt){
+  if(!txt)return 0;
+  const s=String(txt).trim();
+  const mh=/^(\d+)h\s*(\d+)m$/.exec(s);
+  if(mh)return (parseInt(mh[1],10)*3600+parseInt(mh[2],10)*60)*1000;
+  const mm=/^(\d+):(\d+)$/.exec(s);
+  if(mm)return (parseInt(mm[1],10)*60+parseInt(mm[2],10))*1000;
+  return 0;
+}
+// Convierte a número un importe escrito a mano. Los campos Importe del escáner
+// son texto libre, así que puede haber "8300000" (lo que pone el OCR),
+// "8.300.000" (como lo escribe cualquiera acá) o "1200.75" (USD con centavos).
+// Antes se usaba parseFloat() a secas, que leía "8.300.000" como 8.3: un cheque
+// de 8 millones quedaba como 8,3 y así se pegaba en el Excel, sin ningún aviso.
+// Reglas: con punto Y coma, el último de los dos es el decimal. Con uno solo,
+// si tiene 3 dígitos atrás es separador de miles (acá no se usan milésimos, y
+// el OCR a veces escribe "1156.000" queriendo decir "1.156.000"); si tiene 1 o
+// 2, es decimal. Varios separadores iguales solo pueden ser de miles.
+function importeANumero(v){
+  if(typeof v==="number")return isFinite(v)?v:0;
+  if(v===null||v===undefined)return 0;
+  let s=String(v).replace(/[^\d.,\-]/g,"").trim();
+  if(!s)return 0;
+  const neg=s.charAt(0)==="-";
+  s=s.replace(/-/g,"");
+  const ptos=(s.match(/\./g)||[]).length,coms=(s.match(/,/g)||[]).length;
+  let dec="";
+  if(ptos&&coms){
+    dec=s.lastIndexOf(".")>s.lastIndexOf(",")?".":",";
+  }else if(ptos===1||coms===1){
+    const sep=ptos?".":",";
+    dec=(s.length-s.lastIndexOf(sep)-1)===3?"":sep;
+  }
+  let entero=s,frac="";
+  if(dec){
+    const i=s.lastIndexOf(dec);
+    entero=s.slice(0,i);frac=s.slice(i+1);
+  }
+  entero=entero.replace(/[.,]/g,"");
+  frac=frac.replace(/[.,]/g,"");
+  const n=parseFloat((entero||"0")+(frac?"."+frac:""));
+  if(!isFinite(n))return 0;
+  return neg?-n:n;
+}
+// Orden de las tareas ya completadas: la que se terminó primero arriba y la
+// última abajo. Las tareas viejas (guardadas antes de que existiera doneAt) no
+// tienen marca de tiempo, así que van primero y entre ellas se ordenan por
+// orden de creación, para que no salten de lugar.
+function ordenHechas(a,b){
+  const da=a.doneAt||0,db=b.doneAt||0;
+  if(da&&db)return da-db;
+  if(da)return 1;
+  if(db)return -1;
+  return (a.id||0)-(b.id||0);
+}
+// Despliega u oculta la observación de una tarea (botón 📝).
+function mobToggleObs(id,btn){
+  const c=document.getElementById("obs-mob-"+id);
+  if(!c)return;
+  const abierto=c.style.display!=="none";
+  c.style.display=abierto?"none":"block";
+  if(btn)btn.textContent=abierto?"📝 Observación":"📝 Ocultar";
+}
+function calleMsDe(x){return x.calleMs||parseT(x.tCalle);}
+function bancoMsDe(x){return x.bancoMs||parseT(x.tBanco);}
+// Total de una tarea = traslado (calle) + tiempo en el banco.
+function totalMsDe(x){return x.totalMs||(calleMsDe(x)+bancoMsDe(x));}
+
+// ── TOAST ──
+let toastTmr=null;
+function toast(msg,color){const t=document.getElementById("mob-toast");t.style.borderLeft="4px solid "+(color||"var(--blue)");t.textContent=msg;t.style.display="block";if(toastTmr)clearTimeout(toastTmr);toastTmr=setTimeout(()=>t.style.display="none",3500);}
+
+// ── EMP ──
+function toggleEmp(){emp=emp==="tracto"?"agri":"tracto";document.getElementById("emp-btn").textContent=emp==="tracto"?"Tracto":"Agricultural";renderJournal();fillBancosMob();renderCuentas();}
+
+// ── PAGES ──
+function showMobPage(id,el){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));
+  document.getElementById("page-"+id).classList.add("active");
+  el.classList.add("active");
+  document.getElementById("fab-btn").style.display=id==="jour"?"flex":"none";
+  if(id==="jour")renderJournal();
+  if(id==="scan"){if(!document.getElementById("mob-fecha-acred").value)document.getElementById("mob-fecha-acred").value=today();applyScanModeVisibility();}
+  if(id==="ctas")renderCuentas();
+  if(id==="acuses")renderAcuses();
+}
+
+async function renderAcuses(){
+  const cont=document.getElementById("mob-acuses-lista");
+  cont.innerHTML='<div style="text-align:center;color:var(--tx2);padding:30px 0">Cargando...</div>';
+  const items=window.FDSupabase?await window.FDSupabase.loadAcuses():[];
+  const grupos={};
+  items.forEach(function(it){const k=it.banco||"Sin banco";(grupos[k]=grupos[k]||[]).push(it);});
+  const bancos=Object.keys(grupos).sort();
+  if(!bancos.length){cont.innerHTML='<div style="text-align:center;color:var(--tx2);padding:40px 16px">Todavía no hay acuses guardados.<br>Se van a agrupar acá automáticamente según el banco de cada tarea.</div>';return;}
+  cont.innerHTML=bancos.map(function(b){
+    const lista=grupos[b];
+    return '<div class="card" style="margin-bottom:12px">'
+      +'<div class="card-title">🏦 Acuse '+b+' <span style="color:var(--tx2);font-weight:600">('+lista.length+')</span></div>'
+      +lista.map(function(it){
+        return '<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd)">'
+          +'<img src="'+it.imagen+'" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--bd);cursor:pointer" onclick="verAcuseFull(this.src)">'
+          +'<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">'+(it.txt||"")+'</div>'
+          +'<div style="font-size:11px;color:var(--tx2)">'+(it.fecha||"")+(it.monto?" · "+fM(it.monto,it.mon):"")+'</div></div></div>';
+      }).join("")
+      +'</div>';
+  }).join("");
+}
+function verAcuseFull(src){document.getElementById("acuse-view-img").src=src;document.getElementById("modal-acuse-view").classList.add("open");}
+function cerrarAcuseFull(){document.getElementById("modal-acuse-view").classList.remove("open");}
+
+// ── JOURNAL RENDER ──
+function renderJournal(){
+  const hoy=new Date();
+  document.getElementById("j-fecha-mob").textContent=hoy.toLocaleDateString("es-PY",{weekday:"long",day:"numeric",month:"long"});
+  document.getElementById("j-emp-sub").textContent=emp==="tracto"?"Tracto Agro Vial S.A.":"Agricultural Business S.R.L.";
+  const hT=tareas.filter(t=>t.para==="hoy"),mT=tareas.filter(t=>t.para==="manana");
+  const don=hT.filter(t=>t.st==="done").length,pen=hT.length-don;
+  const pct=hT.length?Math.round(don/hT.length*100):0;
+  document.getElementById("jm-don").textContent=don;
+  document.getElementById("jm-pen").textContent=pen;
+  document.getElementById("j-pct-mob").textContent=pct+"%";
+  document.getElementById("j-bar-mob").style.width=pct+"%";
+  // dep/ret counts
+  const depD=hT.filter(t=>t.tipo==="deposito"&&t.st==="done").length;
+  const retD=hT.filter(t=>t.tipo==="retiro"&&t.st==="done").length;
+  document.getElementById("jm-dep").textContent=depD;
+  document.getElementById("jm-ret").textContent=retD;
+
+  const PRI=["alta","media","baja"];
+  const PRI_LBL={alta:"🔴 Urgente",media:"🟡 Media",baja:"🟢 Baja"};
+  const PRI_EL={alta:"j-alta-mob",media:"j-media-mob",baja:"j-baja-mob"};
+  // Dibuja una tarea. Se usa igual para las completadas de arriba y para las
+  // pendientes agrupadas por prioridad de abajo.
+  function itemMob(t){
+      const isDone=t.st==="done";
+      const isEC=t.st==="en_camino";
+      const isEB=t.st==="en_banco";
+      const tipoTag=t.tipo==="deposito"?`<span class="tag tag-dep">Depósito</span>`:t.tipo==="retiro"?`<span class="tag tag-ret">Retiro</span>`:`<span class="tag tag-gen">General</span>`;
+      const monTag=t.mon?`<span class="tag ${t.mon==="USD"?"tag-usd":"tag-gs"}">${t.mon}</span>`:"";
+      const bancoTag=t.banco?`<span class="tag" style="background:var(--bg);color:var(--tx2)">🏦 ${t.banco}</span>`:"";
+      const nomTag=t.nom?`<span class="tag" style="background:var(--bg);color:var(--tx2)">👤 ${t.nom}</span>`:"";
+      const montoTag=t.monto?`<span class="tag" style="background:var(--bg);color:var(--tx2)">${fM(t.monto,t.mon)}</span>`:"";
+      // El acuse solo aplica a tareas generales (depósito/retiro no lo usan).
+      // Es opcional: no se pide automáticamente al terminar la tarea — hay
+      // un botón acá al lado para sacarle la foto cuando quieras.
+      const acuseBtnHtml=(isDone&&t.tipo==="general")
+        ?`<div style="margin-top:6px"><button class="phase-btn" style="flex:none;width:auto;padding:7px 12px;background:${t.acuse?"var(--gl)":"var(--bg)"};color:${t.acuse?"var(--green)":"var(--tx2)"};border:1px solid ${t.acuse?"var(--green)":"var(--bd)"}" onclick="abrirAcuseParaTarea(${t.id})">${t.acuse?"📎 Acuse ✓ (cambiar)":"📎 Agregar acuse"}</button></div>`
+        :"";
+      // phase buttons
+      let phaseBtns="";
+      if(!isDone){
+        if(t.st==="pend")phaseBtns=`<div class="phase-btns"><button class="phase-btn pb-iniciar" onclick="mobIniciar(${t.id})">🚶 Iniciar</button></div>`;
+        else if(isEC)phaseBtns=`<div class="phase-btns"><button class="phase-btn pb-banco" onclick="mobBanco(${t.id})">${t.tipo==="general"?"📍 Llegué":"🏦 Llegué al banco"}</button></div>`;
+        else if(isEB)phaseBtns=`<div class="phase-btns"><button class="phase-btn pb-terminar" onclick="mobTerminar(${t.id})">✅ Terminé</button></div>`;
+      }
+      // Resumen final de tiempos: caja nueva, separada de la lógica del
+      // cronómetro en vivo (crono-strip) — ocupa el mismo lugar apenas la
+      // tarea se completa, para que ahí siempre haya algo visible en esa
+      // posición (antes había un hueco entre que el cronómetro en vivo
+      // desaparecía y el resumen de texto aparecía, y ahí se veía
+      // "desaparecer" el dato).
+      const cronoHtml=(isEC||isEB)
+        ?`<div class="crono-strip"><span class="crono-lbl">${isEC?"🚶 "+(t.tipo==="general"?"En camino":"Calle"):(t.tipo==="general"?"📍 En destino":"🏦 Banco")}</span><span class="crono-val" id="crono-mob-${t.id}">${t.cronoInicio?fmtT(elapsedForTask(t)):"00:00"}</span></div>`
+        :(isDone&&(t.tCalle||t.tBanco))
+          ?`<div class="crono-final">✅${t.tCalle?` <span>🚶 ${t.tCalle}</span>`:""}${t.tBanco?` <span>🏦 ${t.tBanco}</span>`:""}${totalMsDe(t)?` <span>⏱️ Total: ${fmtT(totalMsDe(t))}</span>`:""}</div>`
+          :"";
+      // La observación no ocupa lugar hasta que se pide: se muestra como un
+      // botón chico y el texto recién se despliega al tocarlo.
+      const obsHtml=t.obs
+        ?`<div style="margin-top:6px"><button class="phase-btn" style="flex:none;width:auto;padding:6px 11px;background:var(--al);color:var(--amber);border:1px solid var(--amber)" onclick="mobToggleObs(${t.id},this)">📝 Observación</button><div id="obs-mob-${t.id}" style="display:none;margin-top:6px;background:var(--bg);border-left:3px solid var(--amber);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--tx2);white-space:pre-wrap">${t.obs}</div></div>`
+        :"";
+      return `<div class="task-item">
+        <div class="task-check ${isDone?"done":""}" onclick="mobCycle(${t.id})">${isDone?`<i class="ti ti-check" style="font-size:12px"></i>`:""}</div>
+        <div class="task-body">
+          <div class="task-txt ${isDone?"done":""}">${t.txt}</div>
+          <div class="task-meta">${tipoTag}${monTag}${bancoTag}${nomTag}${montoTag}</div>
+          ${phaseBtns}${cronoHtml}${obsHtml}${acuseBtnHtml}
+        </div>
+        <button onclick="mobDelT(${t.id})" style="border:none;background:none;color:var(--tx3);font-size:18px;padding:4px;cursor:pointer"><i class="ti ti-trash"></i></button>
+      </div>`;
+  }
+  // Completadas: arriba de todo, sin importar la prioridad, en el orden en que
+  // se fueron terminando (la primera arriba, la última abajo).
+  const hechas=hT.filter(t=>t.st==="done").sort(ordenHechas);
+  const elH=document.getElementById("j-hechas-mob");
+  elH.innerHTML=hechas.length
+    ?`<div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;padding:8px 0 4px">✅ Completadas (${hechas.length})</div>`+hechas.map(itemMob).join("")
+    :"";
+  // Pendientes: abajo, agrupadas por prioridad como siempre.
+  PRI.forEach(p=>{
+    const items=hT.filter(t=>t.pri===p&&t.st!=="done");
+    const el=document.getElementById(PRI_EL[p]);
+    if(!items.length){el.innerHTML="";return;}
+    el.innerHTML=`<div style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;padding:8px 0 4px">${PRI_LBL[p]}</div>`+items.map(itemMob).join("");
+  });
+  document.getElementById("j-empty-mob").style.display=hT.length?"none":"block";
+  // mañana
+  const mc=document.getElementById("jm-manana-card"),ml=document.getElementById("jm-manana");
+  if(mT.length){mc.style.display="block";ml.innerHTML=mT.map(t=>`<div class="task-item"><div class="task-body"><div class="task-txt" style="color:var(--tx2);font-style:italic">${t.txt}</div></div><button onclick="mobMoveHoy(${t.id})" style="border:none;background:none;color:var(--blue);font-size:13px;font-weight:700;cursor:pointer">Hoy</button></div>`).join("");}
+  else mc.style.display="none";
+}
+
+// ── CRONÓMETRO ──
+// El cronómetro ahora vive en el propio objeto de la tarea (t.cronoInicio /
+// t.cronoFase), que se sincroniza vía Supabase. Así, si se inicia desde el
+// celular, la PC (y cualquier otro celular) también ve el reloj corriendo,
+// y viceversa — no importa qué dispositivo lo arrancó.
+function mobIniciar(id){
+  const t=tareas.find(t=>t.id===id);if(!t)return;
+  limpiarAnclas(id); // si la tarea se rehace, no arrastrar el ancla de la vuelta anterior
+  t.st="en_camino";t.cronoFase="calle";t.cronoInicio=Date.now();t.startedAt=Date.now();t.calleMs=0;t.bancoMs=0;t.totalMs=0;
+  delete t.tCalle;delete t.tBanco;delete t.tTotal;
+  sv();
+  if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"iniciada",txt:t.txt,taskId:id});
+  toast("🚶 En camino...","var(--amber)");renderJournal();
+}
+function mobBanco(id){
+  const t=tareas.find(t=>t.id===id);if(!t)return;
+  t.calleMs=faseMs(t);                 // cierra la etapa de calle
+  limpiarAnclas(id);                   // y arranca un ancla nueva para la etapa de banco
+  t.cronoFase="banco";t.cronoInicio=Date.now();
+  t.st="en_banco";t.bancoMs=0;sv();
+  if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"banco",txt:t.txt,taskId:id,tCalle:fmtT(t.calleMs)});
+  toast("🏦 Llegaste al banco","var(--blue)");renderJournal();
+}
+function mobTerminar(id){
+  const t=tareas.find(t=>t.id===id);if(!t)return;
+  // Cierra la etapa que esté corriendo. La etapa se decide con faseDe() —
+  // estado + cronoFase — y no con cronoFase a secas: si ese campo llegaba
+  // vacío o desactualizado desde otro dispositivo, el tiempo del banco no se
+  // guardaba nunca (quedaba en 0) y por eso el "Total" salía igual al tiempo
+  // de calle.
+  if(t.cronoInicio){
+    if(faseDe(t)==="banco")t.bancoMs=faseMs(t);
+    else t.calleMs=faseMs(t);
+  }
+  t.calleMs=t.calleMs||0;t.bancoMs=t.bancoMs||0;
+  t.totalMs=t.calleMs+t.bancoMs;
+  const tCalle=fmtT(t.calleMs),tBanco=fmtT(t.bancoMs),tTotal=fmtT(t.totalMs);
+  t.st="done";t.doneAt=Date.now();t.tCalle=tCalle;t.tBanco=tBanco;t.tTotal=tTotal;
+  delete t.cronoInicio;delete t.cronoFase;
+  limpiarAnclas(id);
+  if(t.tipo!=="general"&&t.banco&&t.monto){
+    const monto=parseFloat(t.monto)||0,mon=t.mon||"GS",tc=7850;
+    ops.push({id:nO++,tipo:t.tipo,emp,mon,monto,tc,enGs:mon==="USD"?Math.round(monto*tc):monto,banco:t.banco,nom:t.nom||t.txt,fecha:today()});nO++;
+  }
+  const agId=nA;
+  agenda.push({id:nA++,txt:t.txt,tipo:t.tipo,pri:t.pri,mon:t.mon,monto:t.monto,banco:t.banco,nom:t.nom,fecha:today(),completada:today(),tCalle,tBanco,tTotal,calleMs:t.calleMs,bancoMs:t.bancoMs,totalMs:t.totalMs,startedAt:t.startedAt||0,doneAt:t.doneAt||0,obs:t.obs||"",asignado:t.asignado||""});nA++;
+  t.agendaId=agId; // para que el botón "Agregar acuse" (opcional, se toca cuando quieras) sepa a qué registro del historial ligar la foto
+  sv();
+  if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"completada",txt:t.txt,taskId:id,tCalle,tBanco,tTotal,calleMs:t.calleMs,bancoMs:t.bancoMs,totalMs:t.totalMs});
+  renderJournal();
+  toast("✅ Tarea completada — Calle: "+tCalle+" | Banco: "+tBanco+" | Total: "+tTotal,"var(--green)");
+}
+// Único intervalo compartido que repinta el reloj de CUALQUIER tarea en curso,
+// la haya iniciado este celular, la PC, u otro dispositivo.
+// Usa un "ancla" local (performance.now()) en vez de comparar directamente
+// contra el reloj del dispositivo que puso cronoInicio, para que no se quede
+// pegado en 00:00 si los relojes de los dos equipos no están sincronizados.
+let cronoAnchors={};
+// La etapa en curso se deduce del estado y no solo de cronoFase, porque ese
+// campo puede llegar vacío desde un dispositivo que sincronizó una versión
+// anterior de la tarea.
+function faseDe(t){return t.cronoFase||(t.st==="en_banco"?"banco":"calle");}
+function limpiarAnclas(id){
+  Object.keys(cronoAnchors).forEach(function(k){if(k.indexOf(id+":")===0)delete cronoAnchors[k];});
+}
+function elapsedForTask(t){
+  if(!t.cronoInicio)return 0;
+  const key=t.id+":"+faseDe(t);
+  if(!cronoAnchors[key]){
+    cronoAnchors[key]={perfStart:performance.now(),elapsedAtStart:Math.max(0,Date.now()-t.cronoInicio)};
+  }
+  const a=cronoAnchors[key];
+  return a.elapsedAtStart+(performance.now()-a.perfStart);
+}
+// Cuánto duró la etapa que está corriendo, tomado del MISMO reloj que muestra
+// el cronómetro en vivo (el ancla con performance.now()) en lugar de restar
+// Date.now()-cronoInicio. Ese resto era el problema: cronoInicio lo pudo poner
+// otro dispositivo con el reloj corrido y, si ese reloj iba adelantado, la
+// resta daba negativo → Math.max(0,...) la dejaba en 0. Así el tiempo de banco
+// se guardaba en 00:00 y el total terminaba siendo solo el tiempo de calle.
+function faseMs(t){
+  const anclado=Math.round(elapsedForTask(t));
+  if(anclado>0)return anclado;
+  return Math.max(0,Date.now()-(t.cronoInicio||Date.now()));
+}
+setInterval(()=>{
+  tareas.forEach(t=>{
+    if((t.st==="en_camino"||t.st==="en_banco")&&t.cronoInicio){
+      const el=document.getElementById("crono-mob-"+t.id);
+      if(el)el.textContent=fmtT(elapsedForTask(t));
+    }
+  });
+},1000);
+// ── DE VUELTA A LA OFICINA ──
+// Antes esto existía solo en la PC y era 100% local. Ahora lo maneja el
+// celular (que es el que efectivamente viaja) y el estado se sincroniza por
+// Supabase con la clave "fd-oficina", así el escritorio lo ve en vivo pero de
+// solo lectura.
+// El cronómetro se mide con un ancla local (performance.now()), igual que el de
+// las tareas: "inicio" lo puede haber puesto otro dispositivo con el reloj
+// corrido, y restar Date.now() a secas daría un tiempo negativo o disparatado.
+let oficinaAnchor=null;
+function oficinaMs(){
+  if(!oficina.activo||!oficina.inicio)return 0;
+  if(!oficinaAnchor||oficinaAnchor.inicio!==oficina.inicio){
+    oficinaAnchor={inicio:oficina.inicio,perfStart:performance.now(),elapsedAtStart:Math.max(0,Date.now()-oficina.inicio)};
+  }
+  return Math.round(oficinaAnchor.elapsedAtStart+(performance.now()-oficinaAnchor.perfStart));
+}
+function guardarOficina(){
+  try{localStorage.setItem("ft-mob-oficina",JSON.stringify(oficina));}catch(e){}
+  sv(); // sv() ya empuja "oficina" a Supabase junto con el resto del estado
+}
+function renderOficinaMob(){
+  const pre=document.getElementById("oficina-pre-mob"),act=document.getElementById("oficina-activo-mob");
+  if(!pre||!act)return;
+  if(oficina.activo){
+    pre.style.display="none";act.style.display="block";
+    document.getElementById("oficina-lugar-txt-mob").textContent=oficina.lugar?("Volviendo desde: "+oficina.lugar):"Volviendo a la oficina";
+    document.getElementById("oficina-crono-mob").textContent=fmtT(oficinaMs());
+  }else{
+    pre.style.display="block";act.style.display="none";
+    // Se limpia el bloque oculto para que el próximo viaje no arranque
+    // mostrando por un instante el lugar y el tiempo del anterior.
+    document.getElementById("oficina-lugar-txt-mob").textContent="";
+    document.getElementById("oficina-crono-mob").textContent="00:00";
+  }
+  const hist=document.getElementById("oficina-hist-mob");
+  // Solo las vueltas de HOY (ver la nota equivalente en la PC).
+  const previos=(oficina.hist||[]).filter(v=>(v.fecha||"")===today()).slice(0,3);
+  hist.innerHTML=previos.length
+    ?'<div style="margin-top:10px;font-size:11px;color:var(--tx2);font-weight:700">Últimas vueltas</div>'
+      +previos.map(function(v){return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--bd)"><span style="color:var(--tx2)">'+(v.lugar||"Sin lugar")+'</span><span style="font-weight:700;font-family:monospace;color:var(--blue)">'+(v.tTotal||fmtT(v.ms||0))+'</span></div>';}).join("")
+    :"";
+}
+function oficinaIniciarMob(){
+  const lugar=(document.getElementById("oficina-lugar-mob").value||"").trim();
+  oficina.activo=true;oficina.lugar=lugar;oficina.inicio=Date.now();
+  oficinaAnchor=null;
+  guardarOficina();renderOficinaMob();
+  toast("🏢 Volviendo a la oficina"+(lugar?" desde "+lugar:""),"var(--blue)");
+}
+function oficinaTerminarMob(){
+  if(!oficina.activo)return;
+  const ms=oficinaMs(),tTotal=fmtT(ms),lugar=oficina.lugar;
+  oficina.hist=[{lugar:lugar,ms:ms,tTotal:tTotal,fecha:today(),fin:Date.now()}].concat(oficina.hist||[]).slice(0,20);
+  oficina.activo=false;oficina.inicio=null;oficina.lugar="";
+  oficinaAnchor=null;
+  document.getElementById("oficina-lugar-mob").value="";
+  guardarOficina();renderOficinaMob();
+  toast("✅ Llegaste a la oficina"+(lugar?" — desde "+lugar:"")+" · "+tTotal,"var(--green)");
+}
+setInterval(function(){
+  if(oficina.activo){
+    const el=document.getElementById("oficina-crono-mob");
+    if(el)el.textContent=fmtT(oficinaMs());
+  }
+},1000);
+function mobCycle(id){
+  const t=tareas.find(t=>t.id===id);if(!t)return;
+  if(t.st==="en_camino"||t.st==="en_banco")return;
+  if(t.st==="done"){t.st="pend";delete t.doneAt;sv();renderJournal();return;}
+  if(t.tipo==="general"){mobIniciar(id);return;} // las tareas generales también usan el cronómetro (Iniciar → Llegué → Terminé)
+  t.st="done";t.doneAt=Date.now();
+  const agId2=nA;
+  agenda.push({id:nA++,txt:t.txt,tipo:t.tipo,pri:t.pri,mon:t.mon,monto:t.monto,banco:t.banco,nom:t.nom,fecha:today(),completada:today(),tCalle:"",tBanco:"",tTotal:"",calleMs:0,bancoMs:0,totalMs:0,asignado:t.asignado||""});nA++;
+  t.agendaId=agId2;
+  sv();renderJournal();
+}
+function mobDelT(id){tareas=tareas.filter(t=>t.id!==id);sv();renderJournal();}
+function mobMoveHoy(id){const t=tareas.find(t=>t.id===id);if(t){t.para="hoy";t.st="pend";delete t.doneAt;sv();renderJournal();}}
+
+// ── MODAL TAREA ──
+function setSeg(segId,idx,cls){document.querySelectorAll("#"+segId+" .seg-opt").forEach((b,i)=>b.className="seg-opt"+(i===idx?" "+cls:""));}
+function openModalTarea(){
+  mtTipo="deposito";mtMon="GS";mtInst="efectivo";mtCanal="ventanilla";mtPri="alta";
+  ["mt-txt-mob","mt-obs-mob","mt-monto-mob","mt-nom-mob","mt-gen-dueno-mob","mt-gen-cant-mob","mt-gen-solic-otro-mob"].forEach(id=>{const e=document.getElementById(id);if(e)e.value="";});
+  document.getElementById("mt-gen-tarea-mob").value="pagare";document.getElementById("mt-gen-solic-mob").value="Préstamo";setGenTareaMob();
+  setSeg("mseg-tipo",1,"on-g");setSeg("mseg-pri",0,"on-r");setSeg("mseg-mon",0,"on");setSeg("mseg-inst",0,"on");setSeg("mseg-canal",0,"on");
+  document.getElementById("mt-op-mob").style.display="block";
+  document.getElementById("mt-cta-mob").style.display="none";
+  fillBancosMob();
+  document.getElementById("modal-mob-tarea").classList.add("open");
+  setTimeout(()=>document.getElementById("mt-txt-mob").focus(),200);
+}
+function closeMobModal(){document.getElementById("modal-mob-tarea").classList.remove("open");}
+function setMTipo(t,el){mtTipo=t;document.querySelectorAll("#mseg-tipo .seg-opt").forEach(b=>b.className="seg-opt");el.className="seg-opt "+(t==="deposito"?"on-g":t==="retiro"?"on-r":"on");document.getElementById("mt-op-mob").style.display=t!=="general"?"block":"none";document.getElementById("mt-banco-lbl-mob").textContent=t==="general"?"¿A qué banco vas? (opcional)":"Banco";fillBancosMob();setGenTareaMob();}
+// Muestra los campos que corresponden al trámite elegido (ver la versión de PC).
+function setGenTareaMob(){
+  const esGen=mtTipo==="general";
+  const g=esGen?document.getElementById("mt-gen-tarea-mob").value:"";
+  const solic=document.getElementById("mt-gen-solic-mob").value;
+  const ver=(id,cond)=>{const e=document.getElementById(id);if(e)e.style.display=cond?"block":"none";};
+  ver("mt-gen-mob",esGen);
+  ver("mt-gen-dueno-box-mob",g==="pagare");
+  ver("mt-gen-cant-box-mob",g==="rechazado");
+  ver("mt-gen-solic-box-mob",g==="solicitud");
+  ver("mt-gen-solic-otro-box-mob",g==="solicitud"&&solic==="otro");
+  ver("mt-txt-box-mob",!esGen||g==="otro");
+  const lbl=document.getElementById("mt-banco-lbl-mob");
+  if(lbl&&esGen)lbl.textContent=(g==="pagare"||g==="rechazado")?"Banco":"¿A qué banco vas? (opcional)";
+}
+// Arma la descripción de una tarea general con los datos cargados.
+function textoGenTareaMob(banco){
+  const g=document.getElementById("mt-gen-tarea-mob").value;
+  if(g==="otro")return document.getElementById("mt-txt-mob").value.trim();
+  if(g==="pagare"){
+    const d=document.getElementById("mt-gen-dueno-mob").value.trim();
+    return "Retirar pagaré"+(d?" de "+d:"")+(banco?" — "+banco:"");
+  }
+  if(g==="rechazado"){
+    const c=parseInt(document.getElementById("mt-gen-cant-mob").value,10)||0;
+    return "Retirar "+(c>1?c+" cheques rechazados":"cheque rechazado")+(banco?" — "+banco:"");
+  }
+  if(g==="solicitud"){
+    let x=document.getElementById("mt-gen-solic-mob").value;
+    if(x==="otro")x=document.getElementById("mt-gen-solic-otro-mob").value.trim();
+    return "Entregar solicitud"+(x?" de "+x:"")+(banco?" — "+banco:"");
+  }
+  return "";
+}
+function setMPri(p,el){mtPri=p;document.querySelectorAll("#mseg-pri .seg-opt").forEach(b=>b.className="seg-opt");el.className="seg-opt "+(p==="alta"?"on-r":p==="media"?"":"on-g");}
+function setMMon(m,el){mtMon=m;document.querySelectorAll("#mseg-mon .seg-opt").forEach(b=>b.className="seg-opt");el.className="seg-opt on";fillBancosMob();}
+function setMInst(i,el){mtInst=i;document.querySelectorAll("#mseg-inst .seg-opt").forEach(b=>b.className="seg-opt");el.className="seg-opt on";}
+function setMCanal(c,el){mtCanal=c;document.querySelectorAll("#mseg-canal .seg-opt").forEach(b=>b.className="seg-opt");el.className="seg-opt on";}
+// En las tareas generales solo el nombre del banco (ver la nota en la PC).
+function fillBancosMob(){
+  const sel=document.getElementById("mt-banco-mob");if(!sel)return;
+  if(mtTipo==="general"){
+    const vistos={},nombres=[];
+    CTAS[emp].forEach(c=>{if(!vistos[c.b]){vistos[c.b]=1;nombres.push(c.b);}});
+    sel.innerHTML='<option value="">No aplica / entrega no bancaria</option>'+nombres.map(b=>`<option value="${b}|">${b}</option>`).join("");
+  }else{
+    sel.innerHTML='<option value="">No aplica / entrega no bancaria</option>'+CTAS[emp].filter(c=>mtMon==="GS"||(c.usd&&c.usd!=="-")).map(c=>`<option value="${c.b}|${mtMon==="GS"?c.gs:c.usd}">${c.b} — ${mtMon==="GS"?c.gs:c.usd}</option>`).join("");
+  }
+  document.getElementById("mt-cta-mob").style.display="none";
+}
+function mobMostrarCta(){const v=document.getElementById("mt-banco-mob").value;if(mtTipo==="general"||!v){document.getElementById("mt-cta-mob").style.display="none";return;}document.getElementById("mt-numcta-mob").value=v.split("|")[1]||"";document.getElementById("mt-cta-mob").style.display="block";}
+function guardarTareaMob(){
+  const bv=document.getElementById("mt-banco-mob").value,bp=bv.split("|");
+  const genTarea=mtTipo==="general"?document.getElementById("mt-gen-tarea-mob").value:"";
+  // En las tareas generales de la lista la descripción se arma sola.
+  const txt=mtTipo==="general"?textoGenTareaMob(bp[0]||""):document.getElementById("mt-txt-mob").value.trim();
+  if(!txt){toast(mtTipo==="general"&&genTarea!=="otro"?"Completá los datos de la tarea":"Ingresá una descripción","#A32D2D");return;}
+  if(mtTipo==="general"&&(genTarea==="pagare"||genTarea==="rechazado")&&!bp[0]){toast("Elegí el banco","#A32D2D");return;}
+  const monto=parseFloat(document.getElementById("mt-monto-mob").value)||0;
+  tareas.push({id:nT++,txt,genTarea:genTarea,
+    genDueno:genTarea==="pagare"?document.getElementById("mt-gen-dueno-mob").value.trim():"",
+    genCant:genTarea==="rechazado"?(parseInt(document.getElementById("mt-gen-cant-mob").value,10)||0):0,
+    genSolic:genTarea==="solicitud"?(document.getElementById("mt-gen-solic-mob").value==="otro"?document.getElementById("mt-gen-solic-otro-mob").value.trim():document.getElementById("mt-gen-solic-mob").value):"",pri:mtPri,st:"pend",para:"hoy",tipo:mtTipo,mon:mtTipo!=="general"?mtMon:"",inst:mtTipo!=="general"?mtInst:"",canal:mtTipo!=="general"?mtCanal:"",monto:mtTipo!=="general"?monto:0,tc:7850,banco:bp[0]||"",numcta:bp[1]||"",nom:document.getElementById("mt-nom-mob").value,obs:(document.getElementById("mt-obs-mob").value||"").trim(),emp,fecha:today()});
+  nT++;sv();closeMobModal();renderJournal();toast("✅ Tarea agregada","var(--green)");
+  if(window.FDSupabase)window.FDSupabase.sendPushTrigger("🚜 Finanzas Tracto — Nueva tarea",txt+(bp[0]?" — "+bp[0]:"")+(monto?" · "+monto:""));
+}
+
+// ── ACUSE ──
+function abrirAcuseMob(taskId,txt,agendaId){acuseTaskId=taskId;acuseAgendaId=agendaId!=null?agendaId:null;acuseB64=null;document.getElementById("acuse-tarea-nom-mob").textContent=txt||"";document.getElementById("acuse-prev-mob").style.display="none";document.getElementById("acuse-zone-mob").style.display="block";document.getElementById("acuse-inp-mob").value="";document.getElementById("modal-acuse-mob").classList.add("open");}
+function acuseMobFile(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    const img=new Image();
+    img.onload=()=>{
+      // Las fotos de cámara pueden pesar varios MB; se redimensionan y
+      // recomprimen acá para que la subida a Supabase sea rápida y no
+      // falle por tamaño.
+      const MAX=1280;
+      let w=img.width,h=img.height;
+      if(w>MAX||h>MAX){
+        if(w>=h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}
+      }
+      const canvas=document.createElement("canvas");
+      canvas.width=w;canvas.height=h;
+      canvas.getContext("2d").drawImage(img,0,0,w,h);
+      acuseB64=canvas.toDataURL("image/jpeg",0.72);
+      document.getElementById("acuse-img-mob").src=acuseB64;
+      document.getElementById("acuse-prev-mob").style.display="block";
+      document.getElementById("acuse-zone-mob").style.display="none";
+    };
+    img.onerror=()=>{
+      acuseB64=ev.target.result;
+      document.getElementById("acuse-img-mob").src=ev.target.result;
+      document.getElementById("acuse-prev-mob").style.display="block";
+      document.getElementById("acuse-zone-mob").style.display="none";
+    };
+    img.src=ev.target.result;
+  };
+  r.readAsDataURL(f);
+}
+// Se llama desde el botón "Agregar acuse" de la tarea (opcional, no se abre
+// solo). Busca la tarea fresca por id para no pasar texto del usuario por el
+// atributo onclick (evita romperse con comillas/caracteres raros en el texto
+// de la tarea).
+function abrirAcuseParaTarea(id){
+  const t=tareas.find(t=>t.id===id);if(!t)return;
+  abrirAcuseMob(t.id,t.txt,t.agendaId!=null?t.agendaId:null);
+}
+async function guardarAcuseMob(){
+  if(acuseB64&&acuseTaskId){
+    try{
+      const t=tareas.find(t=>t.id===acuseTaskId);
+      const banco=t?t.banco:"",txt=t?t.txt:"",monto=t?t.monto:0,mon=t?t.mon:"";
+      toast("📎 Guardando acuse...","var(--blue)");
+      const res=window.FDSupabase?await window.FDSupabase.saveAcuse(banco,txt,monto,mon,today(),acuseB64):{ok:false,error:"Sin conexión a Supabase"};
+      if(res.ok){
+        if(t){t.acuse=true;sv();} // solo una marca liviana, no la imagen entera
+        const a=acuseAgendaId!=null?agenda.find(a=>a.id===acuseAgendaId):null;
+        if(a){a.acuse=true;sv();}
+      }
+      toast(res.ok?"✅ Acuse guardado":"⚠️ No se pudo subir: "+(res.error||"error desconocido"),res.ok?"var(--green)":"#A32D2D");
+    }catch(e){
+      // Cualquier error inesperado ahora SIEMPRE se avisa — antes una
+      // excepción acá (por ejemplo, al decodificar una imagen mal formada)
+      // se perdía en silencio y parecía que "no pasaba nada".
+      console.error("[FinTracto] Error guardando el acuse:",e);
+      toast("⚠️ No se pudo guardar el acuse: "+(e.message||"error desconocido"),"#A32D2D");
+    }
+  }
+  document.getElementById("modal-acuse-mob").classList.remove("open");
+  renderJournal();
+  acuseTaskId=null;acuseB64=null;acuseAgendaId=null;
+}
+function omitirAcuseMob(){
+  document.getElementById("modal-acuse-mob").classList.remove("open");
+  acuseTaskId=null;acuseB64=null;acuseAgendaId=null;
+}
+
+// ── ESCÁNER ──
+function mobHandleFile(e){const f=e.target.files[0];if(f)mobProcImg(f);}
+function mobProcImg(file){
+  const r=new FileReader();
+  r.onload=ev=>{
+    const img=new Image();
+    img.onload=()=>{
+      scanImgOrig=img;
+      // Las fotos de cámara suelen pesar varios MB, muy por encima del límite
+      // de OCR.space y más pesadas de lo que necesita el OCR para leer bien.
+      // Se reescala a un ancho máximo razonable antes de mandarla.
+      const maxW=1800;
+      const scale=img.width>maxW?maxW/img.width:1;
+      const w=Math.round(img.width*scale),h=Math.round(img.height*scale);
+      const cv=document.createElement("canvas");cv.width=w;cv.height=h;
+      cv.getContext("2d").drawImage(img,0,0,w,h);
+      const dataUrl=cv.toDataURL("image/jpeg",0.85);
+      scanB64=dataUrl.split(",")[1];
+      document.getElementById("mob-scan-img").src=dataUrl;
+      document.getElementById("mob-scan-prev").style.display="block";
+      document.getElementById("mob-scan-resultado").style.display="none";
+      ocrParsed={};ocrRaw="";
+    };
+    img.onerror=()=>{
+      scanB64=ev.target.result.split(",")[1];
+      document.getElementById("mob-scan-img").src=ev.target.result;
+      document.getElementById("mob-scan-prev").style.display="block";
+      document.getElementById("mob-scan-resultado").style.display="none";
+      ocrParsed={};ocrRaw="";
+    };
+    img.src=ev.target.result;
+  };
+  r.readAsDataURL(file);
+}
+function mobResetScan(){
+  document.getElementById("mob-scan-prev").style.display="none";
+  document.getElementById("mob-scan-resultado").style.display="none";
+  document.getElementById("mob-scan-inp").value="";
+  scanB64=null;ocrParsed={};ocrRaw="";scanImgOrig=null;
+  document.getElementById("mob-ocr-fields").innerHTML="";
+  const rawBox=document.getElementById("mob-ocr-raw");if(rawBox){rawBox.style.display="none";rawBox.textContent="";}
+  ["desc-banco","desc-nrochq","desc-serie","desc-ctacte","desc-documento","desc-tipodoc","desc-cliente","desc-importe","desc-emision","desc-venc","dep-nch","dep-banco","dep-importe"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+  const db=document.getElementById("desc-banco");if(db)db.placeholder="Ej: 17";
+  const dt=document.getElementById("desc-tipo");if(dt)dt.value="DIFERIDO";
+  const dm=document.getElementById("desc-moneda");if(dm)dm.value="PYG";
+  const depm=document.getElementById("dep-moneda");if(depm)depm.value="GS";
+  const sb=document.getElementById("desc-serie-zoom-btn");if(sb)sb.style.display="none";
+}
+
+// ── Modo de escaneo (Depósito / Descuento) ──
+function applyScanModeVisibility(){
+  document.getElementById("desc-list-card").style.display=scanMode==="descuento"?"block":"none";
+  document.getElementById("depo-list-card").style.display=scanMode==="deposito"?"block":"none";
+  document.getElementById("scan-deposito-save").style.display=scanMode==="deposito"?"block":"none";
+  document.getElementById("scan-descuento-save").style.display=scanMode==="descuento"?"block":"none";
+  if(scanMode==="descuento")renderDescuentosList();
+  else renderDepositosList();
+}
+function setScanMode(m,el){
+  scanMode=m;
+  document.querySelectorAll("#mseg-scanmode .seg-opt").forEach(b=>b.className="seg-opt");
+  el.className="seg-opt "+(m==="deposito"?"on-g":"on");
+  applyScanModeVisibility();
+  if(ocrRaw)renderOcrSummary();
+}
+function toggleOcrDebug(){
+  const box=document.getElementById("mob-ocr-raw");
+  const showing=box.style.display!=="none";
+  box.style.display=showing?"none":"block";
+  if(!showing)box.textContent=ocrRaw||"(sin texto)";
+}
+
+// ── Extracción de datos del cheque (best-effort, todo queda editable) ──
+// El OCR no siempre respeta el orden visual de las dos columnas de arriba
+// ("Cuenta Número" | "Serie - Cheque Número"), así que en vez de buscar el
+// valor pegado a su etiqueta, cada dato se identifica por su FORMATO propio
+// (la cuenta paraguaya siempre termina en "/dígito"; serie+cheque es un
+// token corto seguido de una tanda de 6-9 dígitos sin barra) y, a medida que
+// se va encontrando cada uno, se lo saca del texto de trabajo para que sus
+// dígitos no se confundan con los del siguiente dato que se busca.
+function parseChequeOCR(ocrRawText){
+  const p={};
+  const tx=ocrRawText.replace(/\n/g," ");
+  const lineas=ocrRawText.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  // \b en JS no trata las letras con tilde como "de palabra", así que sin
+  // sacarles el acento algo como "Número" deja un falso límite entre la N
+  // y la ú, y puede leerse esa "N" sola como si fuera un token corto (serie,
+  // etc.). Se usa una copia sin tildes solo para las búsquedas de tokens
+  // cortos/números; el texto con tildes original se sigue usando para banco
+  // y nombre de cliente.
+  let work=tx.normalize("NFD").replace(/[̀-ͯ]/g,"");
+
+  // Banco emisor (nombre impreso en el cheque) + su código numérico oficial
+  // (el mismo que se usa en el PDF de exportación), para autocompletar
+  // directamente el campo "Banco (código)" sin tener que tipearlo a mano.
+  const BANCOS_PY=[
+    ["Central del Paraguay",1],["Nacional de Fomento",2],["Nacion Argentina",3],
+    ["GNB",4],["Do Brasil",5],["Citibank",6],["Sudameris",8],["Continental",20],
+    ["Basa",30],["Visión",39],["Río",40],["Familiar",41],["Atlas",42],
+    ["Bancop",43],["Interfisa",44],["Solar",45],["Ueno",46],["Zeta",47],
+    // De la lista anterior, sin código numérico confirmado todavía:
+    ["Regional",null],["FIC",null]
+  ];
+  const workUp=work.toUpperCase();
+  for(const [nom,cod] of BANCOS_PY.slice().sort((a,b)=>b[0].length-a[0].length)){
+    const nomNorm=nom.normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase();
+    if(workUp.includes(nomNorm)){p.banco=nom;p.bancoCod=cod;break;}
+  }
+
+  // Empresa destino (solo Depósito) — se deduce de a nombre de quién está el
+  // cheque ("Páguese a la orden de..."), no de ningún selector manual.
+  if(/agricultural\s*business|agrisa/i.test(work))p.empDetectada="agri";
+  else if(/tracto\s*agro\s*vial|\btracto\b/i.test(work))p.empDetectada="tracto";
+
+  // Tipo: "CHEQUE VISTA" vs "CHEQUE DIFERIDO", impreso en el cheque
+  if(/\bVISTA\b/i.test(tx))p.tipo="VISTA";
+  else if(/\bDIFERIDO\b/i.test(tx))p.tipo="DIFERIDO";
+
+  // Fecha de emisión y de vencimiento (cheque diferido).
+  // Un cheque diferido trae DOS fechas impresas: la de emisión (el día que
+  // se llenó el cheque, puede ser cualquier día pasado) y la de vencimiento
+  // (el día de pago). Antes solo se buscaba una y "Vencimiento" quedaba
+  // siempre vacío. Ahora se buscan las dos, en el orden en que aparecen en
+  // el texto: la primera va a Emisión, la segunda a Vencimiento.
+  const fechasEncontradas=[...tx.matchAll(/\b(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{2,4})\b/g)]
+    .map(fm=>{const y=fm[3].length===2?"20"+fm[3]:fm[3];return fm[1].padStart(2,"0")+"/"+fm[2].padStart(2,"0")+"/"+y;});
+  if(fechasEncontradas[0])p.fecha=fechasEncontradas[0];
+  if(fechasEncontradas[1])p.fechaVenc=fechasEncontradas[1];
+
+  // Documento (CI/RUC) del firmante, impreso junto al QR — se saca primero
+  // del texto de trabajo para que sus dígitos no se confundan con la cuenta
+  // o con el N° de cheque más adelante.
+  const docM=work.match(/\b(RUC|C\.?I\.?)\b\D{0,4}([\d][\d.\-]{3,13}\d|\d{4,10})/i);
+  if(docM){
+    p.tipoDoc=/^R/i.test(docM[1])?"RUC":"C.I";
+    p.documento=docM[2].replace(/\.$/,"");
+    work=work.slice(0,docM.index)+" "+work.slice(docM.index+docM[0].length);
+    // Cliente: nombre en alguna de las líneas previas a la línea con CI/RUC
+    const idx=lineas.findIndex(l=>/\b(RUC|C\.?I\.?)\b/i.test(l));
+    const badWords=/agencia|avda|casa central|cuenta|firmas|cheque|páguese|pague|orden|banco|suma|guaran|sucursal|calle|ruta|barrio|edificio|\bpiso\b|\blocal\b|esquina|\besq\b|\bnro\b|n°|c\/|km\b/i;
+    if(idx>0){
+      for(let i=idx-1;i>=0&&i>=idx-4;i--){
+        const l=lineas[i];
+        if(l.length>=5&&l.length<=45&&!/\d/.test(l)&&!badWords.test(l)&&/[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(l)){p.cliente=l;break;}
+      }
+    }
+  }
+
+  // Cuenta Número: puede venir en un solo grupo con un separador al final
+  // ("7.0.270500/3"), o partida en varios grupos con más de un separador
+  // (ej. "300-4050-308") — se tolera barra, guion o espacio como separador,
+  // repetido las veces que haga falta entre grupos de dígitos.
+  // Formato específico de Itaú: "7.0.NNNNNN/N" (un dígito, punto, un dígito,
+  // punto, 6 dígitos, barra, un dígito) — se prueba primero porque es una
+  // forma bien puntual e inconfundible; evita que se pegue con un número de
+  // la dirección que esté justo al lado separado por un simple espacio
+  // (como pasaba con "OLIVA 349 7.0.002610/0": antes agarraba el "349"
+  // también porque el patrón genérico tolera espacios en el medio).
+  let ctaM=work.match(/\b(\d\.\d\.\d{5,7}\/\d)\b/);
+  const esFormatoCuentaItau=!!ctaM;
+  if(!ctaM)ctaM=work.match(/(\d[\d.\s]{0,12}[\/\-]\d[\d\-]{0,10})\b/);
+  if(ctaM){
+    p.ctaCte=ctaM[1].replace(/\s+/g," ").trim();
+    work=work.slice(0,ctaM.index)+" "+work.slice(ctaM.index+ctaM[0].length);
+  }
+  // El nombre de Itaú suele venir dentro de un logo estilizado, no como
+  // texto plano, así que el OCR muchas veces no lo lee. Si no se detectó
+  // ningún banco por nombre pero SÍ apareció el formato de cuenta exclusivo
+  // de Itaú (arriba), se infiere el banco por ahí — se marca como
+  // "inferido" para que quede claro que conviene confirmarlo a mano.
+  if(!p.banco&&esFormatoCuentaItau){p.banco="Itaú (inferido por formato de cuenta)";p.bancoCod=17;}
+
+  // N° de cheque, y serie por separado: probamos primero si vienen pegados
+  // (serie + espacio + número).
+  const scM=work.match(/\b([A-Za-z]{1,2}|[0-9]{1,2})\s+(\d{6,9})\b/);
+  if(scM){
+    p.serie=scM[1];p.nch=scM[2];
+    work=work.slice(0,scM.index)+" "+work.slice(scM.index+scM[0].length);
+  }
+  if(!p.nch){
+    const nchP=[/UBBR\s*(\d{4,})/i,/n[o°]\s*(\d{4,8})/i,/\b(\d{6,9})\b/];
+    for(const rgx of nchP){const m=work.match(rgx);if(m){p.nch=m[1];work=work.slice(0,m.index)+" "+work.slice(m.index+m[0].length);break;}}
+  }
+  // Si la serie no vino pegada al número de cheque, aparece SOLA en su
+  // propia línea, a la izquierda — es decir, en la línea inmediatamente
+  // ANTERIOR a la línea donde está el número de cheque. Se ancla ahí (no a
+  // cualquier línea corta suelta del documento, que agarraba cosas como la
+  // fecha o cualquier otro número aislado).
+  if(!p.serie&&p.nch){
+    const idxNch=lineas.findIndex(l=>l.includes(p.nch));
+    if(idxNch>0){
+      const candidata=lineas[idxNch-1];
+      if(/^[A-Za-z]{1,2}$/.test(candidata)||/^[0-9]{1,2}$/.test(candidata))p.serie=candidata;
+    }
+  }
+
+  // Importe: el símbolo de guaraní (Ø/₲) suele salir mal leído del OCR, y a
+  // veces se come algún punto de miles (ej: "1156.000" en vez de
+  // "1.156.000"), así que en vez de exigir un formato prolijo de a 3 dígitos
+  // se toma, de lo que queda en el texto de trabajo (ya sin cuenta/documento/
+  // cheque), el número más largo/con separadores — el que mejor pinta de
+  // importe tiene — siempre que el valor final tenga sentido para un cheque.
+  const montoCands=work.match(/\d[\d.,]{1,14}\d|\d{4,9}/g)||[];
+  let mejorMonto=null,mejorScore=-1;
+  for(const cand of montoCands){
+    const limpio=cand.replace(/[.,]/g,"");
+    const val=parseFloat(limpio);
+    if(!val||val<1000||val>9999999999)continue;
+    const score=(/[.,]/.test(cand)?1000:0)+limpio.length;
+    if(score>mejorScore){mejorScore=score;mejorMonto=limpio;}
+  }
+  if(mejorMonto)p.monto=mejorMonto;
+
+  return p;
+}
+
+function renderOcrSummary(){
+  let campos;
+  if(scanMode==="descuento"){
+    campos=[
+      ["Banco (texto)",ocrParsed.banco?(ocrParsed.banco+(ocrParsed.bancoCod!=null?" — cód. "+ocrParsed.bancoCod:"")):null],
+      ["Cuenta cte.",ocrParsed.ctaCte],
+      ["Serie",ocrParsed.serie],
+      ["N° cheque",ocrParsed.nch],
+      ["Documento",(ocrParsed.tipoDoc&&ocrParsed.documento)?(ocrParsed.tipoDoc+" "+ocrParsed.documento):null],
+      ["Cliente",ocrParsed.cliente],
+      ["Importe",ocrParsed.monto?("Gs. "+fN(importeANumero(ocrParsed.monto))):null],
+      ["Emisión",ocrParsed.fecha],
+      ["Vencimiento",ocrParsed.fechaVenc]
+    ];
+  }else{
+    campos=[["N° cheque",ocrParsed.nch],["Banco emisor",ocrParsed.banco],["Importe",ocrParsed.monto?("Gs. "+fN(importeANumero(ocrParsed.monto))):null],["Fecha",ocrParsed.fecha]];
+  }
+  const detectados=campos.filter(c=>c[1]);
+  document.getElementById("mob-ocr-fields").innerHTML=detectados.length
+    ?'<div style="background:var(--gl);border-radius:10px;padding:10px;margin-bottom:8px">'+detectados.map(c=>`<div class="ocr-field"><span class="ocr-field-lbl">${c[0]}</span><span class="ocr-field-val">${c[1]}</span></div>`).join("")+"</div>"
+    :'<div style="color:var(--tx2);font-size:13px;margin-bottom:8px">No se detectaron datos específicos. Revisá el texto completo.</div>';
+  if(scanMode==="descuento")fillDescuentoForm();
+  else fillDepositoForm();
+}
+function fillDepositoForm(){
+  document.getElementById("dep-nch").value=ocrParsed.nch||"";
+  document.getElementById("dep-banco").value=ocrParsed.banco||"";
+  document.getElementById("dep-importe").value=ocrParsed.monto||"";
+  document.getElementById("dep-moneda").value="GS";
+}
+function fillDescuentoForm(){
+  document.getElementById("desc-banco").value=(ocrParsed.bancoCod!=null)?String(ocrParsed.bancoCod):"";
+  document.getElementById("desc-banco").placeholder=ocrParsed.banco?("Detectado: "+ocrParsed.banco+(ocrParsed.bancoCod==null?" (código no cargado, completar a mano)":"")):"Ej: 17";
+  document.getElementById("desc-tipo").value=ocrParsed.tipo||"DIFERIDO";
+  document.getElementById("desc-nrochq").value=ocrParsed.nch||"";
+  document.getElementById("desc-serie").value=ocrParsed.serie||"";
+  document.getElementById("desc-ctacte").value=ocrParsed.ctaCte||"";
+  document.getElementById("desc-documento").value=ocrParsed.documento||"";
+  document.getElementById("desc-tipodoc").value=ocrParsed.tipoDoc||"";
+  document.getElementById("desc-cliente").value=ocrParsed.cliente||"";
+  document.getElementById("desc-importe").value=ocrParsed.monto||"";
+  document.getElementById("desc-emision").value=ocrParsed.fecha||"";
+  document.getElementById("desc-venc").value=ocrParsed.fechaVenc||"";
+  document.getElementById("desc-serie-zoom-btn").style.display=(!ocrParsed.serie&&scanImgOrig)?"block":"none";
+}
+
+async function ocrSpaceRequest(base64Jpeg){
+  const fd=new FormData();
+  fd.append("base64Image","data:image/jpeg;base64,"+base64Jpeg);
+  fd.append("language","spa");
+  fd.append("isOverlayRequired","false");
+  fd.append("apikey","K82919407788957");
+  fd.append("OCREngine","2");
+  fd.append("scale","true");
+  fd.append("detectOrientation","true");
+  const res=await fetch("https://api.ocr.space/parse/image",{method:"POST",body:fd});
+  const data=await res.json();
+  if(data.IsErroredOnProcessing)throw new Error(Array.isArray(data.ErrorMessage)?data.ErrorMessage.join(" "):(data.ErrorMessage||"Error de OCR"));
+  return (data.ParsedResults&&data.ParsedResults[0])?data.ParsedResults[0].ParsedText:"";
+}
+async function mobEscanear(){
+  if(!scanB64){toast("Primero tomá una foto","#A32D2D");return;}
+  document.getElementById("mob-spin").style.display="inline";
+  document.getElementById("mob-scan-resultado").style.display="block";
+  document.getElementById("mob-ocr-fields").innerHTML='<div style="text-align:center;padding:16px;color:var(--tx2)"><span class="spin"></span> Procesando...</div>';
+  try{
+    ocrRaw=await ocrSpaceRequest(scanB64);
+    document.getElementById("mob-spin").style.display="none";
+    if(!ocrRaw.trim()){document.getElementById("mob-ocr-fields").innerHTML='<div style="color:var(--tx2)">No se pudo leer el texto. Intentá con mejor iluminación.</div>';return;}
+    ocrParsed=parseChequeOCR(ocrRaw);
+    renderOcrSummary();
+  }catch(err){document.getElementById("mob-spin").style.display="none";document.getElementById("mob-ocr-fields").innerHTML='<div style="color:#A32D2D">Error: '+(err.message||"de conexión, verificá el internet")+'</div>';}
+}
+async function mobZoomSerie(){
+  if(!scanImgOrig){toast("No hay foto original para volver a leer","#A32D2D");return;}
+  const btn=document.getElementById("desc-serie-zoom-btn");
+  const btnHtml=btn.innerHTML;
+  btn.innerHTML='<span style="font-size:11px;color:var(--tx2)"><span class="spin"></span> Leyendo...</span>';
+  try{
+    // Recorta la franja de arriba donde suele estar la celda de "Serie -
+    // Cheque Número" y la agranda antes de mandarla al OCR: al ser una
+    // letra/dígito chico, con más resolución relativa el motor la lee mejor
+    // que en la foto completa. Best-effort: no siempre está esa celda
+    // exactamente ahí según cómo se haya encuadrado la foto.
+    const img=scanImgOrig;
+    const sx=Math.round(img.width*0.30), sy=Math.round(img.height*0.02);
+    const sw=Math.round(img.width*0.42), sh=Math.round(img.height*0.24);
+    const targetW=Math.min(1600,sw*4);
+    const targetH=Math.round(sh*(targetW/sw));
+    const cv=document.createElement("canvas");cv.width=targetW;cv.height=targetH;
+    cv.getContext("2d").drawImage(img,sx,sy,sw,sh,0,0,targetW,targetH);
+    const cropB64=cv.toDataURL("image/jpeg",0.92).split(",")[1];
+    const rawZoom=await ocrSpaceRequest(cropB64);
+    const txz=rawZoom.replace(/\n/g," ").normalize("NFD").replace(/[̀-ͯ]/g,"");
+    const nchActual=document.getElementById("desc-nrochq").value.trim();
+    const ctaActual=document.getElementById("desc-ctacte").value.replace(/\s+/g,"");
+    const skip=/^(de|la|el|un|no|nº|n°|cta|cte)$/i;
+    let found=null;
+    const re=/\b([A-Za-z0-9]{1,3})\b/g;
+    let m;
+    while((m=re.exec(txz))){
+      const tok=m[1];
+      if(/^\d+$/.test(tok)&&tok.length>=4)continue;
+      if(nchActual&&nchActual.includes(tok))continue;
+      if(ctaActual&&ctaActual.includes(tok))continue;
+      if(skip.test(tok))continue;
+      found=tok;break;
+    }
+    if(found){
+      document.getElementById("desc-serie").value=found;
+      toast("✅ Serie detectada con zoom: "+found,"var(--green)");
+      btn.style.display="none";
+    }else{
+      toast("Tampoco se pudo leer con zoom — completala a mano","#A32D2D");
+      btn.innerHTML=btnHtml;
+    }
+  }catch(err){
+    toast("Error al reintentar: "+(err.message||""),"#A32D2D");
+    btn.innerHTML=btnHtml;
+  }
+}
+// Empresa (Tracto/Agri) del depósito: se deduce de a nombre de quién está el
+// cheque (lo detecta parseChequeOCR en p.empDetectada); si no se pudo
+// detectar, se pregunta antes de guardar para no archivarlo mal.
+function mobGuardarCheque(){
+  const fechaAcred=document.getElementById("mob-fecha-acred").value||today();
+  const nch=document.getElementById("dep-nch").value.trim();
+  const bancoCheque=document.getElementById("dep-banco").value.trim();
+  const mon=document.getElementById("dep-moneda").value||"GS";
+  const monto=importeANumero(document.getElementById("dep-importe").value);
+  if(monto<=0){toast("Completá el importe antes de guardar","#A32D2D");return;}
+  const empDet=ocrParsed.empDetectada||(confirm('No pude detectar si este cheque es para "Tracto Agro Vial" o "Agricultural Business".\n\nAceptar = Tracto Agro Vial\nCancelar = Agricultural Business')?"tracto":"agri");
+  // Se guarda en "ops" (resumen del día, como antes) Y en la pila de
+  // depositos (para que se vea en la PC, en Escáner → Lote de cheques,
+  // igual que ya pasa con los descuentos).
+  ops.push({id:nO++,tipo:"deposito",emp:empDet,mon,monto,tc:7850,enGs:mon==="GS"?monto:monto*7850,banco:bancoCheque,numCta:"",nom:"Cheque escaneado",nch,fecha:fechaAcred,origen:"scanner"});
+  depositos.push({id:nDp++,nch,banco:bancoCheque,mon,monto,fecha:fechaAcred,emp:empDet});
+  sv();
+  toast("✅ Cheque guardado ("+depositos.length+" en total)","var(--green)");
+  mobResetScan();
+  renderDepositosList();
+}
+function mobBorrarDeposito(id){
+  depositos=depositos.filter(d=>d.id!==id);
+  sv();
+  renderDepositosList();
+}
+function renderDepositosList(){
+  const cont=document.getElementById("depo-lista");
+  document.getElementById("depo-count").textContent=depositos.length;
+  if(!depositos.length){cont.innerHTML='<div style="text-align:center;color:var(--tx2);padding:16px 0;font-size:13px">Todavía no escaneaste ningún cheque para depósito.</div>';return;}
+  cont.innerHTML=depositos.slice().reverse().map(d=>`
+    <div class="ocr-field" style="align-items:flex-start">
+      <span class="ocr-field-lbl">${d.emp==="tracto"?"Tracto":"Agri"}<br><span style="font-weight:400;color:var(--tx2)">Cheque ${d.nch||"-"} · ${d.banco||"-"}</span></span>
+      <span class="ocr-field-val">${fM(d.monto,d.mon)}<br><span style="font-weight:400;color:#A32D2D;cursor:pointer" onclick="mobBorrarDeposito(${d.id})">Eliminar</span></span>
+    </div>`).join("");
+}
+
+// ── DESCUENTO: lista acumulada, se sincroniza sola con la PC ──
+function svDesc(){
+  try{localStorage.setItem("ft-mob-desc",JSON.stringify(descuentos));}catch(e){}
+  if(window.FDSupabase)window.FDSupabase.pushAll({tareas,ops,agenda,descuentos,depositos});
+}
+function mobGuardarDescuento(){
+  const rec={
+    id:nD++,
+    banco:document.getElementById("desc-banco").value.trim(),
+    tipo:document.getElementById("desc-tipo").value,
+    moneda:document.getElementById("desc-moneda").value,
+    nch:document.getElementById("desc-nrochq").value.trim(),
+    serie:document.getElementById("desc-serie").value.trim(),
+    ctaCte:document.getElementById("desc-ctacte").value.trim(),
+    documento:document.getElementById("desc-documento").value.trim(),
+    importe:document.getElementById("desc-importe").value.trim(),
+    venc:document.getElementById("desc-venc").value||"",
+    cliente:document.getElementById("desc-cliente").value.trim(),
+    tipoDoc:document.getElementById("desc-tipodoc").value.trim(),
+    emision:document.getElementById("desc-emision").value||""
+  };
+  if(!rec.nch&&!rec.importe){toast("Completá al menos el N° de cheque o el importe","#A32D2D");return;}
+  descuentos.push(rec);
+  svDesc();
+  toast("✅ Descuento guardado ("+descuentos.length+" en total)","var(--green)");
+  mobResetScan();
+  renderDescuentosList();
+}
+function mobBorrarDescuento(id){
+  descuentos=descuentos.filter(d=>d.id!==id);
+  svDesc();
+  renderDescuentosList();
+}
+function renderDescuentosList(){
+  const cont=document.getElementById("desc-lista");
+  document.getElementById("desc-count").textContent=descuentos.length;
+  if(!descuentos.length){cont.innerHTML='<div style="text-align:center;color:var(--tx2);padding:16px 0;font-size:13px">Todavía no escaneaste ningún cheque para descuento.</div>';return;}
+  cont.innerHTML=descuentos.slice().reverse().map(d=>`
+    <div class="ocr-field" style="align-items:flex-start">
+      <span class="ocr-field-lbl">${d.cliente||"(sin cliente)"}<br><span style="font-weight:400;color:var(--tx2)">Cheque ${d.nch||"-"} · ${d.banco||"-"}</span></span>
+      <span class="ocr-field-val">Gs. ${fN(importeANumero(d.importe))}<br><span style="font-weight:400;color:#A32D2D;cursor:pointer" onclick="mobBorrarDescuento(${d.id})">Eliminar</span></span>
+    </div>`).join("");
+}
+
+// ── CUENTAS ──
+function setCuentasTab(tab){cuentasTab=tab;document.getElementById("cta-btn-t").className="seg-opt"+(tab==="tracto"?" on":"");document.getElementById("cta-btn-a").className="seg-opt"+(tab==="agri"?" on":"");renderCuentas();}
+function renderCuentas(){
+  const cols=["#185FA5","#1D9E75","#D85A30","#854F0B","#534AB7","#A32D2D","#085041","#0F6E56","#3C3489","#3B6D11","#0C447C","#993C1D","#415FA5","#4D9E75"];
+  document.getElementById("mob-ctas-lista").innerHTML=CTAS[cuentasTab].map((c,i)=>`
+    <div class="banco-card" style="border-left-color:${cols[i%cols.length]}">
+      <div class="banco-name">${c.b}</div>
+      <div class="cta-row"><span class="cta-mon cta-gs">Gs.</span><span class="cta-num">${c.gs}</span></div>
+      <div class="cta-row"><span class="cta-mon cta-usd">USD</span><span class="cta-num">${c.usd}</span></div>
+    </div>`).join("");
+}
+
+// ── CLOSE MODALS ON OUTSIDE CLICK ──
+document.getElementById("modal-mob-tarea").addEventListener("click",function(e){if(e.target===this)closeMobModal();});
+document.getElementById("modal-acuse-mob").addEventListener("click",function(e){if(e.target===this)omitirAcuseMob();});
+
+// ── INIT ──
+fillBancosMob();
+renderJournal();
+renderOficinaMob();
+renderCuentas();
+document.getElementById("mob-fecha-acred").value=today();
+document.getElementById("fab-btn").style.display="flex";
+
+// Combina la lista de tareas que llega de otro dispositivo con la local.
+// Si acá una tarea YA está "done" con su cronómetro final guardado
+// (tCalle/tBanco) y lo que llega de la nube para esa misma tarea todavía no
+// la muestra terminada, se descarta lo que llegó — es el eco de otro
+// dispositivo que todavía no se enteró de la finalización; aplicarlo a
+// ciegas hacía que el cronómetro final apareciera un instante y
+// desapareciera (la tarea "volvía" a en_camino/en_banco).
+function mergeTareasRemoto(remoto){
+  var porId={};
+  tareas.forEach(function(t){porId[t.id]=t;});
+  return remoto.map(function(rt){
+    var local=porId[rt.id];
+    if(local&&local.st==="done"&&(local.tCalle||local.tBanco)&&rt.st!=="done")return local;
+    return rt;
+  });
+}
+// Aplica un cambio recibido desde otro dispositivo (p.ej. una orden nueva
+// creada en la PC) al estado en memoria de esta app.
+function applyRemoteChangeMob(key,value){
+  if(value==null)return;
+  if(key==="fd-tar"){
+    const idsAntes=new Set(tareas.map(t=>t.id));
+    const nuevas=value.filter(t=>!idsAntes.has(t.id));
+    tareas=mergeTareasRemoto(value);nT=tareas.length?Math.max(0,...tareas.map(t=>t.id))+1:1;renderJournal();
+    nuevas.forEach(t=>notificarNuevaTarea(t));
+  }
+  else if(key==="fd-ops"){ops=value;nO=ops.length?Math.max(0,...ops.map(o=>o.id))+1:1;}
+  else if(key==="fd-agenda"){agenda=value;nA=agenda.length?Math.max(0,...agenda.map(a=>a.id))+1:1;}
+  else if(key==="fd-desc"){descuentos=value;nD=descuentos.length?Math.max(0,...descuentos.map(d=>d.id))+1:1;if(document.getElementById("desc-lista"))renderDescuentosList();}
+  else if(key==="fd-depo"){depositos=value;nDp=depositos.length?Math.max(0,...depositos.map(d=>d.id))+1:1;if(document.getElementById("depo-lista"))renderDepositosList();}
+  else if(key==="fd-notas"){notasJ=value;}
+  else if(key==="fd-oficina"){oficina=Object.assign({activo:false,lugar:"",inicio:null,hist:[]},value);oficinaAnchor=null;renderOficinaMob();}
+  try{
+    if(key==="fd-tar")localStorage.setItem("ft-mob-tar",JSON.stringify(tareas));
+    if(key==="fd-ops")localStorage.setItem("ft-mob-ops",JSON.stringify(ops));
+    if(key==="fd-agenda")localStorage.setItem("ft-mob-ag",JSON.stringify(agenda));
+    if(key==="fd-desc")localStorage.setItem("ft-mob-desc",JSON.stringify(descuentos));
+    if(key==="fd-depo")localStorage.setItem("ft-mob-depo",JSON.stringify(depositos));
+    if(key==="fd-notas")localStorage.setItem("ft-mob-notas",notasJ);
+    if(key==="fd-oficina")localStorage.setItem("ft-mob-oficina",JSON.stringify(oficina));
+  }catch(e){}
+}
+
+// ── NOTIFICACIONES (con el logo de Tracto) ──
+// Se piden permisos apenas carga la app, para poder avisar cuando llega
+// una tarea nueva incluso si el celular está con la app en 2do plano.
+if(window.Notification&&Notification.permission==="default"){
+  try{Notification.requestPermission();}catch(e){}
+}
+function notificarNuevaTarea(t){
+  const cuerpo=(t.txt||"Nueva tarea")+(t.banco?" — "+t.banco:"")+(t.monto?" · "+t.monto+" "+(t.mon||""):"");
+  // Vía Service Worker: sigue funcionando con la app en 2do plano (no la tapa de cerrada del todo).
+  if(navigator.serviceWorker&&navigator.serviceWorker.getRegistration){
+    navigator.serviceWorker.getRegistration().then(function(reg){
+      if(reg&&reg.showNotification){
+        reg.showNotification("🚜 Finanzas Tracto — Nueva tarea",{body:cuerpo,icon:"icon.svg",badge:"icon.svg",vibrate:[120,60,120],tag:"tarea-"+t.id});
+      }else if(window.Notification&&Notification.permission==="granted"){
+        new Notification("🚜 Finanzas Tracto — Nueva tarea",{body:cuerpo,icon:"icon.svg"});
+      }
+    }).catch(function(){
+      if(window.Notification&&Notification.permission==="granted")new Notification("🚜 Finanzas Tracto — Nueva tarea",{body:cuerpo,icon:"icon.svg"});
+    });
+  }else if(window.Notification&&Notification.permission==="granted"){
+    new Notification("🚜 Finanzas Tracto — Nueva tarea",{body:cuerpo,icon:"icon.svg"});
+  }
+  toast("🆕 "+cuerpo,"var(--blue)");
+}
+
+// Trae lo que ya haya en Supabase (tareas/órdenes creadas desde la PC u
+// otro celular) y deja la conexión abierta para recibir cambios al instante.
+// Trae el estado actual completo desde Supabase y lo aplica localmente.
+// Se usa al arrancar y cada vez que el celular vuelve a estar activo
+// (se prende la pantalla de nuevo), porque mientras la pantalla está
+// apagada el navegador pausa la app y se puede perder algún cambio en
+// tiempo real — esto lo recupera sin depender de que llegue otro evento.
+async function ftResyncMob(){
+  if(!window.FDSupabase)return false;
+  const remote=await window.FDSupabase.loadAll();
+  if(!remote)return false;
+  let hubo=false;
+  if(remote["fd-tar"]!=null){tareas=mergeTareasRemoto(remote["fd-tar"]);hubo=true;}
+  if(remote["fd-ops"]!=null){ops=remote["fd-ops"];hubo=true;}
+  if(remote["fd-agenda"]!=null){agenda=remote["fd-agenda"];hubo=true;}
+  if(remote["fd-desc"]!=null){descuentos=remote["fd-desc"];hubo=true;}
+  if(remote["fd-depo"]!=null){depositos=remote["fd-depo"];hubo=true;}
+  if(remote["fd-notas"]!=null&&remote["fd-notas"]!==""){notasJ=remote["fd-notas"];hubo=true;}
+  if(remote["fd-oficina"]!=null){oficina=Object.assign({activo:false,lugar:"",inicio:null,hist:[]},remote["fd-oficina"]);oficinaAnchor=null;hubo=true;}
+  nT=tareas.length?Math.max(0,...tareas.map(t=>t.id))+1:1;
+  nO=ops.length?Math.max(0,...ops.map(o=>o.id))+1:1;
+  nA=agenda.length?Math.max(0,...agenda.map(a=>a.id))+1:1;
+  nD=descuentos.length?Math.max(0,...descuentos.map(d=>d.id))+1:1;
+  nDp=depositos.length?Math.max(0,...depositos.map(d=>d.id))+1:1;
+  if(hubo){localStorage.setItem("ft-mob-tar",JSON.stringify(tareas));localStorage.setItem("ft-mob-ops",JSON.stringify(ops));localStorage.setItem("ft-mob-ag",JSON.stringify(agenda));localStorage.setItem("ft-mob-desc",JSON.stringify(descuentos));localStorage.setItem("ft-mob-depo",JSON.stringify(depositos));localStorage.setItem("ft-mob-notas",notasJ);localStorage.setItem("ft-mob-oficina",JSON.stringify(oficina));}
+  renderJournal();renderOficinaMob();
+  if(document.getElementById("desc-lista"))renderDescuentosList();
+  if(document.getElementById("depo-lista"))renderDepositosList();
+  return hubo;
+}
+async function fdInitMobileSupabase(){
+  if(!window.FDSupabase){toast("Sin conexión a Supabase — trabajando offline","#A32D2D");return;}
+  // Si la primera lectura falla (sin señal, Supabase caído), NO se escribe
+  // nada: la capa de sincronización bloquea las escrituras hasta poder leer.
+  // Se reintenta unas cuantas veces antes de avisar, porque hasta que no lea
+  // este celular trabaja solo en local y sus cambios no viajan a los demás.
+  let hubo=await ftResyncMob();
+  for(let intento=1;intento<=5&&!window.FDSupabase.estaListoParaEscribir();intento++){
+    await new Promise(r=>setTimeout(r,intento*2000));
+    hubo=await ftResyncMob();
+  }
+  if(!window.FDSupabase.estaListoParaEscribir()){
+    // Se avisa pero NO se corta: igual se deja todo suscripto (suscribirse solo
+    // lee), así cuando vuelva la señal y una resincronización tenga éxito, el
+    // guardado se reanuda solo, sin tener que reabrir la app.
+    toast("⚠️ Sin conexión a la nube — podés seguir cargando, pero todavía no se está sincronizando","#A32D2D");
+  }
+  // Si se pudo leer y la nube está realmente vacía (primer uso del sistema),
+  // se siembra con lo que haya en este celular.
+  else if(!hubo)window.FDSupabase.pushAll({tareas,ops,agenda});
+  window.FDSupabase.subscribeDataChanges(function(key,value){
+    // Si justo tenemos un cambio local reciente esperando a mandarse a
+    // Supabase (debounce de sv()), no aplicamos este valor remoto ahora:
+    // podría ser más viejo que lo que se acaba de hacer acá, y pisarlo
+    // haría que la acción se deshaga sola en pantalla. Se pospone hasta
+    // que nuestro propio envío termine, y ahí sí se resincroniza.
+    if(["fd-tar","fd-ops","fd-agenda","fd-desc","fd-depo","fd-notas"].includes(key)&&window.FDSupabase.hasPendingPush()){
+      setTimeout(function(){if(!window.FDSupabase.hasPendingPush())ftResyncMob();},500);
+      return;
+    }
+    applyRemoteChangeMob(key,value);
+  });
+  window.FDSupabase.subscribePush().then(function(ok){
+    if(ok)toast("🔔 Notificaciones activadas en este celular","var(--green)");
+    else toast("⚠️ No se activaron las notificaciones — revisá el permiso de notificaciones del navegador","#A32D2D");
+  });
+}
+// Resincronizar y "despertar" el cronómetro apenas la pantalla vuelve a
+// estar activa (antes se quedaba pegado en el último valor visto).
+document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible"){cronoAnchors={};ftResyncMob();}});
+window.addEventListener("focus",function(){cronoAnchors={};ftResyncMob();});
+// PWA Service Worker — se registra ANTES de fdInitMobileSupabase() porque
+// subscribePush() espera navigator.serviceWorker.ready, y esa promesa no se
+// resuelve hasta que haya un Service Worker registrado y activo. Este era
+// el motivo por el que ningún dispositivo llegaba a registrarse.
+if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(()=>{});}
+fdInitMobileSupabase();
+</script>
+</body>
+</html>
