@@ -57,6 +57,59 @@
     return cargaInicialOk;
   }
 
+  // Cuántas filas trajo la última lectura. Sirve para separar dos situaciones
+  // que antes se confundían: "la nube está realmente vacía (primer uso del
+  // sistema)" y "la lectura no trajo lo que esperábamos" (un corte momentáneo,
+  // una respuesta vacía sin error). Desde acá son indistinguibles, así que este
+  // celular ya no siembra nada solo: los datos buenos los pone la PC.
+  let filasEnLaNube = 0;
+  function hayFilasEnLaNube() {
+    return filasEnLaNube > 0;
+  }
+
+  // Cuántos elementos tiene hoy cada clave en la nube. Con esto se detecta el
+  // patrón del borrado masivo: un celular recién instalado arranca con todo
+  // vacío y, si llega a escribir antes de tener los datos buenos, deja las
+  // listas en cero y eso se replica a todos los dispositivos.
+  const conteoNube = {};
+  function contar(v) {
+    if (Array.isArray(v)) return v.length;
+    if (v && typeof v === "object") return Object.keys(v).length;
+    if (typeof v === "string") return v.length;
+    return v == null ? 0 : 1;
+  }
+
+  // Listas que este celular NUNCA vacía por su cuenta: las tareas se borran de
+  // a una (mobDelT) y las operaciones y la agenda solo se leen. Cualquier envío
+  // que las deje en cero es un error, no una acción del usuario.
+  // "fd-desc" y "fd-depo" quedan afuera a propósito: la PC las vacía cuando
+  // importa los cheques escaneados, y ese vaciado sí tiene que poder subir.
+  const CLAVES_QUE_NO_SE_VACIAN = ["fd-tar", "fd-ops", "fd-agenda"];
+
+  // El usuario pidió borrar algo a propósito (mobDelT sobre la última tarea que
+  // quedaba). Se levanta justo antes de guardar y vale para un solo envío, así
+  // los frenos de más abajo no se interponen en un borrado que sí es
+  // intencional.
+  let borradoDeliberado = false;
+  function marcarBorradoDeliberado() {
+    borradoDeliberado = true;
+  }
+
+  // Aviso a la interfaz cuando se frena un envío que habría vaciado datos.
+  let onBorradoBloqueadoCb = null;
+  function onBorradoBloqueado(cb) {
+    onBorradoBloqueadoCb = cb;
+  }
+
+  // Aviso a la interfaz cuando una escritura SÍ llegó a la nube. Se usa para
+  // saber qué tareas ya quedaron guardadas allá: una tarea que nunca se subió
+  // no puede haber sido "borrada por otro dispositivo", simplemente el otro
+  // todavía no la conocía.
+  let onEscrituraOkCb = null;
+  function onEscrituraOk(cb) {
+    onEscrituraOkCb = cb;
+  }
+
   async function loadAll() {
     const { data, error } = await client
       .from("fd_store")
@@ -70,7 +123,9 @@
     (data || []).forEach((row) => {
       map[row.key] = row.value;
       lastSeen[row.key] = JSON.stringify(row.value);
+      conteoNube[row.key] = contar(row.value);
     });
+    filasEnLaNube = (data || []).length;
     // Se pudo leer (aunque no haya filas todavía): recién ahora es seguro
     // escribir, porque ya sabemos qué hay guardado.
     cargaInicialOk = true;
@@ -82,13 +137,64 @@
       console.warn("[FinTracto] No se escribe '" + key + "': todavía no se pudo leer lo que hay en la nube.");
       return;
     }
+    // ── REGLA DE ORO ──
+    // Nunca se vacía una clave que este celular NO llegó a leer de la nube.
+    // Si no sabemos qué había guardado, borrarlo es indefendible.
+    //
+    // Caso A: la lectura no trajo NI UNA fila. Puede ser que la nube esté vacía
+    // de verdad o que la consulta no haya devuelto nada; desde acá son
+    // indistinguibles. Sin saber qué hay, este celular no escribe nada: ni
+    // vacíos (borraría) ni valores viejos que arrastre de localStorage
+    // (pisaría con datos atrasados). Si de verdad es el primer uso del sistema,
+    // los datos los siembra la PC desde «Mi equipo».
+    if (filasEnLaNube === 0) {
+      console.error(
+        "[FinTracto] No se escribe '" + key + "': la lectura de la nube no trajo ninguna fila."
+      );
+      if (onBorradoBloqueadoCb) onBorradoBloqueadoCb([key]);
+      return;
+    }
+    // Caso B: la lectura funcionó, pero esta clave no vino entre las filas.
+    // Se la puede crear con contenido, nunca vaciar.
+    if (contar(value) === 0 && conteoNube[key] === undefined) {
+      console.error(
+        "[FinTracto] No se escribe '" + key + "' vacío: este celular nunca leyó esa clave de la nube."
+      );
+      if (onBorradoBloqueadoCb) onBorradoBloqueadoCb([key]);
+      return;
+    }
+    // Caso C: la clave es una de las que este celular no vacía nunca, y en la
+    // nube hoy tiene datos. Es el borrado que hay que frenar.
+    if (
+      CLAVES_QUE_NO_SE_VACIAN.indexOf(key) !== -1 &&
+      contar(value) === 0 &&
+      (conteoNube[key] || 0) > 0 &&
+      !borradoDeliberado
+    ) {
+      console.error(
+        "[FinTracto] No se escribe '" + key + "' vacío: en la nube tiene " + conteoNube[key] + " elementos."
+      );
+      if (onBorradoBloqueadoCb) onBorradoBloqueadoCb([key]);
+      return;
+    }
     const str = JSON.stringify(value);
     if (lastSeen[key] === str) return;
+    const anterior = lastSeen[key];
     lastSeen[key] = str;
     const { error } = await client
       .from("fd_store")
       .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" });
-    if (error) console.error("[FinTracto] Error guardando '" + key + "' en Supabase:", error.message);
+    if (error) {
+      // La escritura no llegó a destino: hay que dejar lastSeen como estaba
+      // para que el próximo sv() la vuelva a intentar. Antes quedaba marcada
+      // como "ya enviada" y ese cambio no subía nunca más — seguía viéndose
+      // bien en el celular, pero no existía en la nube.
+      lastSeen[key] = anterior;
+      console.error("[FinTracto] Error guardando '" + key + "' en Supabase:", error.message);
+      return;
+    }
+    conteoNube[key] = contar(value);
+    if (onEscrituraOkCb) onEscrituraOkCb(key, value);
   }
 
   let pendingState = null;
@@ -101,6 +207,25 @@
       pushTimer = null;
       const s = pendingState;
       pendingState = null;
+      const pares = { "fd-tar": s.tareas, "fd-ops": s.ops, "fd-agenda": s.agenda };
+      // Freno al borrado masivo. Si este envío dejaría en cero alguna de las
+      // listas que el celular nunca vacía y que en la nube tienen datos, no es
+      // una acción del usuario: es un celular que todavía no tiene el estado
+      // bueno cargado (lo típico de una instalación nueva o de una
+      // resincronización a medias). Se descarta el envío ENTERO en vez de
+      // replicar el vaciado al resto de los dispositivos.
+      const vaciadas = Object.keys(pares).filter(
+        (k) => contar(pares[k]) === 0 && (conteoNube[k] || 0) > 0
+      );
+      if (vaciadas.length && !borradoDeliberado) {
+        console.error(
+          "[FinTracto] Envío descartado: habría dejado vacías las claves " +
+            vaciadas.join(", ") +
+            " que en la nube tienen datos."
+        );
+        if (onBorradoBloqueadoCb) onBorradoBloqueadoCb(vaciadas);
+        return;
+      }
       saveKey("fd-tar", s.tareas);
       saveKey("fd-ops", s.ops);
       saveKey("fd-agenda", s.agenda);
@@ -109,6 +234,10 @@
       if (s.notasJ !== undefined) saveKey("fd-notas", s.notasJ);
       // "De vuelta a la oficina": lo maneja el celular y la PC solo lo mira.
       if (s.oficina !== undefined) saveKey("fd-oficina", s.oficina);
+      // El flag se limpia DESPUES de lanzar las escrituras: saveKey lo consulta
+      // al principio (antes de cualquier await), asi que tiene que seguir en pie
+      // mientras se recorren las claves.
+      borradoDeliberado = false;
     }, 400);
   }
 
@@ -299,6 +428,10 @@
     pushAll,
     hasPendingPush,
     estaListoParaEscribir,
+    hayFilasEnLaNube,
+    marcarBorradoDeliberado,
+    onBorradoBloqueado,
+    onEscrituraOk,
     subscribeDataChanges,
     subscribePush,
     sendPushTrigger,

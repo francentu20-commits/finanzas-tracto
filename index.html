@@ -832,7 +832,11 @@ function mobCycle(id){
   t.agendaId=agId2;
   sv();renderJournal();
 }
-function mobDelT(id){tareas=tareas.filter(t=>t.id!==id);sv();renderJournal();}
+function mobDelT(id){tareas=tareas.filter(t=>t.id!==id);
+  // Si esta era la ultima tarea, el envio deja la lista en cero y el freno
+  // anti-borrado lo descartaria. Se avisa que es a proposito para que pase.
+  if(!tareas.length&&window.FDSupabase&&window.FDSupabase.marcarBorradoDeliberado)window.FDSupabase.marcarBorradoDeliberado();
+  sv();renderJournal();}
 function mobMoveHoy(id){const t=tareas.find(t=>t.id===id);if(t){t.para="hoy";t.st="pend";delete t.doneAt;sv();renderJournal();}}
 
 // ── MODAL TAREA ──
@@ -1194,13 +1198,22 @@ function parseChequeOCR(ocrRawText){
   const montoCands=work.match(/\d[\d.,]{1,14}\d|\d{4,9}/g)||[];
   let mejorMonto=null,mejorScore=-1;
   for(const cand of montoCands){
-    const limpio=cand.replace(/[.,]/g,"");
-    const val=parseFloat(limpio);
+    // OJO con los decimales. Acá antes se borraban de un saque TODOS los
+    // puntos y comas, y eso trataba el ",00" del final como si fueran dos
+    // dígitos más de miles: "9.120.535,00" entraba como 912.053.500, cien
+    // veces más grande. Encima ese candidato inflado sumaba dos dígitos al
+    // puntaje, así que le ganaba al correcto y era el que quedaba.
+    // importeANumero() ya distingue el separador de miles del decimal
+    // (3 dígitos atrás = miles, 1 o 2 = decimal), que es justo lo que hace
+    // falta para leer bien los ",00".
+    const val=importeANumero(cand);
     if(!val||val<1000||val>9999999999)continue;
-    const score=(/[.,]/.test(cand)?1000:0)+limpio.length;
-    if(score>mejorScore){mejorScore=score;mejorMonto=limpio;}
+    // El puntaje mira los dígitos de la parte entera: los centavos no tienen
+    // que hacer que un importe parezca más grande de lo que es.
+    const score=(/[.,]/.test(cand)?1000:0)+String(Math.trunc(val)).length;
+    if(score>mejorScore){mejorScore=score;mejorMonto=val;}
   }
-  if(mejorMonto)p.monto=mejorMonto;
+  if(mejorMonto)p.monto=String(mejorMonto);
 
   return p;
 }
@@ -1441,16 +1454,126 @@ document.getElementById("fab-btn").style.display="flex";
 function mergeTareasRemoto(remoto){
   var porId={};
   tareas.forEach(function(t){porId[t.id]=t;});
-  return remoto.map(function(rt){
+  var vistos={};
+  var out=(remoto||[]).map(function(rt){
+    vistos[rt.id]=1;
+    idsEnLaNube[rt.id]=1;
     var local=porId[rt.id];
     if(local&&local.st==="done"&&(local.tCalle||local.tBanco)&&rt.st!=="done")return local;
     return rt;
   });
+  // Tareas cargadas en este celular que la copia remota todavía no incluía.
+  // Antes se perdían sin ruido: esta función recorría SOLO la lista remota, así
+  // que cualquier envío de otro dispositivo que no las tuviera las hacía
+  // desaparecer de acá. Ahora se conservan mientras no haya constancia de que
+  // llegaron a la nube: si una tarea nunca se subió, que el otro equipo no la
+  // mande no significa que la hayan borrado, solo que no la conocía.
+  tareas.forEach(function(t){
+    if(t&&t.id!=null&&!vistos[t.id]&&!idsEnLaNube[t.id])out.push(t);
+  });
+  guardarIdsEnLaNube();
+  return out;
+}
+
+// ============================================================
+// ESCUDO DE LECTURA contra el borrado entre dispositivos
+// ------------------------------------------------------------
+// Las protecciones de supabase-sync.js son del lado de la ESCRITURA: este
+// celular no puede subir listas vacías sobre datos que existen en la nube.
+// Del lado de la LECTURA no había ninguna: lo que llegaba por Realtime o por
+// ftResyncMob() se aplicaba tal cual, reemplazando la lista entera. Alcanzaba
+// con que cualquier dispositivo escribiera una lista vacía para que este
+// celular borrara las tareas — y encima las guardara borradas en localStorage.
+// Acá se frena eso: un cambio remoto no puede vaciar ni desplomar una lista
+// que en este celular tiene datos.
+// "fd-desc" y "fd-depo" quedan afuera a propósito: la PC las vacía cuando
+// importa los cheques escaneados, y ese vaciado sí tiene que llegar.
+// ============================================================
+const COLECCIONES_PROTEGIDAS={"fd-tar":"tareas","fd-ops":"operaciones","fd-agenda":"agenda"};
+// Ids de tareas de las que consta que están (o estuvieron) guardadas en la
+// nube: las que vinieron en alguna lectura remota y las que este celular subió
+// con éxito. Ver mergeTareasRemoto().
+//
+// Tiene que SOBREVIVIR al cierre de la app, guardado en localStorage. Si
+// arrancara vacío en cada apertura, todas las tareas que quedaron en este
+// celular pasarían por "creadas acá y nunca subidas", y mergeTareasRemoto()
+// las volvería a agregar: es exactamente el síntoma de que "vuelve lo de ayer,
+// ya todo terminado, por más que se haya cerrado el día". Con la lista
+// guardada, esas tareas constan como conocidas en la nube y, si el cierre del
+// día las sacó de allá, acá también se van.
+const IDS_NUBE_KEY="ft-mob-ids-nube";
+const idsEnLaNube=Object.create(null);
+(function(){
+  var guardados=null;
+  try{guardados=localStorage.getItem(IDS_NUBE_KEY);}catch(e){}
+  if(guardados){
+    try{JSON.parse(guardados).forEach(function(id){idsEnLaNube[id]=1;});}catch(e){}
+  }else{
+    // Primera vez con esta versión: las tareas que ya estaban guardadas en este
+    // celular vienen de sesiones anteriores, así que se dan por conocidas en la
+    // nube. Es la opción prudente — evita resucitar tareas viejas de un saque.
+    tareas.forEach(function(t){if(t&&t.id!=null)idsEnLaNube[t.id]=1;});
+  }
+})();
+let idsNubeTimer=null;
+function guardarIdsEnLaNube(){
+  if(idsNubeTimer)return;
+  idsNubeTimer=setTimeout(function(){
+    idsNubeTimer=null;
+    try{
+      var ids=Object.keys(idsEnLaNube).map(Number).filter(function(n){return !isNaN(n);});
+      // Los ids son crecientes: para no dejar crecer esto sin límite alcanza
+      // con quedarse con los últimos.
+      if(ids.length>5000)ids=ids.sort(function(a,b){return a-b;}).slice(-5000);
+      localStorage.setItem(IDS_NUBE_KEY,JSON.stringify(ids));
+    }catch(e){}
+  },1000);
+}
+function marcarIdsEnLaNube(lista){
+  (lista||[]).forEach(function(t){if(t&&t.id!=null)idsEnLaNube[t.id]=1;});
+  guardarIdsEnLaNube();
+}
+function nEl(v){return Array.isArray(v)?v.length:(v&&typeof v==="object"?Object.keys(v).length:0);}
+function localDeClave(key){
+  if(key==="fd-tar")return tareas;
+  if(key==="fd-ops")return ops;
+  if(key==="fd-agenda")return agenda;
+  return null;
+}
+function borradoRemotoSospechoso(key,local,remoto){
+  if(!COLECCIONES_PROTEGIDAS[key])return false;
+  var nL=nEl(local),nR=nEl(remoto);
+  if(nL===0)return false;          // acá no hay nada que perder
+  // Vaciado total. Se acepta solo si acá quedaba UNA sola: eso es el borrado
+  // normal de la ultima tarea hecho desde otro dispositivo. Que desaparezcan
+  // dos o mas de un saque no es trabajo, es un equipo sin los datos buenos.
+  if(nR===0)return nL>=2;
+  // Desaparece más de la mitad y al menos 3 elementos de una sola vez. Borrar
+  // de a uno (mobDelT, terminar una tarea) pasa sin freno, que es lo normal.
+  return (nL-nR)>=3&&nR*2<=nL;
+}
+// Vuelve a subir el estado bueno de este celular después de frenar un borrado,
+// así la nube no queda vacía para el resto de los dispositivos.
+function restaurarEnLaNube(){
+  if(window.FDSupabase&&window.FDSupabase.estaListoParaEscribir())
+    window.FDSupabase.pushAll({tareas,ops,agenda,descuentos,depositos,notasJ,oficina});
+}
+// Devuelve true si el cambio remoto se descarta (y entonces NO hay que
+// aplicarlo). El aviso sale en pantalla, no solo en la consola.
+function escudoBorrado(key,value){
+  var local=localDeClave(key);
+  if(!borradoRemotoSospechoso(key,local,value))return false;
+  var nombre=COLECCIONES_PROTEGIDAS[key];
+  console.error("[FinTracto] Cambio remoto descartado en '"+key+"': dejaría "+nEl(value)+" de "+nEl(local)+" "+nombre+".");
+  toast("⚠️ Otro dispositivo mandó la lista de "+nombre+" vacía. NO se borró nada acá.","#A32D2D");
+  restaurarEnLaNube();
+  return true;
 }
 // Aplica un cambio recibido desde otro dispositivo (p.ej. una orden nueva
 // creada en la PC) al estado en memoria de esta app.
 function applyRemoteChangeMob(key,value){
   if(value==null)return;
+  if(escudoBorrado(key,value))return;
   if(key==="fd-tar"){
     const idsAntes=new Set(tareas.map(t=>t.id));
     const nuevas=value.filter(t=>!idsAntes.has(t.id));
@@ -1511,9 +1634,9 @@ async function ftResyncMob(){
   const remote=await window.FDSupabase.loadAll();
   if(!remote)return false;
   let hubo=false;
-  if(remote["fd-tar"]!=null){tareas=mergeTareasRemoto(remote["fd-tar"]);hubo=true;}
-  if(remote["fd-ops"]!=null){ops=remote["fd-ops"];hubo=true;}
-  if(remote["fd-agenda"]!=null){agenda=remote["fd-agenda"];hubo=true;}
+  if(remote["fd-tar"]!=null&&!escudoBorrado("fd-tar",remote["fd-tar"])){tareas=mergeTareasRemoto(remote["fd-tar"]);hubo=true;}
+  if(remote["fd-ops"]!=null&&!escudoBorrado("fd-ops",remote["fd-ops"])){ops=remote["fd-ops"];hubo=true;}
+  if(remote["fd-agenda"]!=null&&!escudoBorrado("fd-agenda",remote["fd-agenda"])){agenda=remote["fd-agenda"];hubo=true;}
   if(remote["fd-desc"]!=null){descuentos=remote["fd-desc"];hubo=true;}
   if(remote["fd-depo"]!=null){depositos=remote["fd-depo"];hubo=true;}
   if(remote["fd-notas"]!=null&&remote["fd-notas"]!==""){notasJ=remote["fd-notas"];hubo=true;}
@@ -1546,9 +1669,35 @@ async function fdInitMobileSupabase(){
     // guardado se reanuda solo, sin tener que reabrir la app.
     toast("⚠️ Sin conexión a la nube — podés seguir cargando, pero todavía no se está sincronizando","#A32D2D");
   }
-  // Si se pudo leer y la nube está realmente vacía (primer uso del sistema),
-  // se siembra con lo que haya en este celular.
-  else if(!hubo)window.FDSupabase.pushAll({tareas,ops,agenda});
+  // ACÁ ESTABA EL BORRADO. Antes, si la lectura no traía nada, esta app daba
+  // por hecho que era el primer uso del sistema y subía el estado de este
+  // celular. Pero una lectura vacía TAMBIÉN pasa cuando la consulta no
+  // devuelve nada aunque la nube tenga todo (un corte momentáneo, una
+  // respuesta vacía sin error), y en ese caso lo que se subía era el estado de
+  // una instalación recién hecha: listas vacías que pisaban las tareas
+  // cargadas y de ahí el borrado se replicaba a la PC y a los demás.
+  // No hay forma de distinguir los dos casos desde acá, así que este celular
+  // ya no siembra nada solo. Si de verdad es el primer uso, los datos se
+  // suben a mano desde la PC («Mi equipo» → subir los datos de esta PC).
+  else if(!hubo&&!window.FDSupabase.hayFilasEnLaNube()){
+    toast("⚠️ La nube no devolvió ningún dato. Por seguridad NO se subió nada de este celular.","#A32D2D");
+  }
+  // Si alguna vez se frena un envío que habría vaciado datos, que se vea en
+  // pantalla y no solo en la consola.
+  if(window.FDSupabase.onBorradoBloqueado){
+    window.FDSupabase.onBorradoBloqueado(function(claves){
+      toast("⚠️ Se evitó un borrado: este celular intentó subir "+claves.length+" lista(s) vacía(s) sobre datos que sí existen en la nube.","#A32D2D");
+    });
+  }
+  // Cada vez que una lista de tareas se sube con éxito, queda constancia de que
+  // esas tareas YA están en la nube. Es lo que después permite distinguir un
+  // borrado hecho en otro dispositivo (una tarea que estaba guardada y ya no
+  // viene) de una copia remota atrasada que todavía no la conocía.
+  if(window.FDSupabase.onEscrituraOk){
+    window.FDSupabase.onEscrituraOk(function(key,value){
+      if(key==="fd-tar")marcarIdsEnLaNube(value);
+    });
+  }
   window.FDSupabase.subscribeDataChanges(function(key,value){
     // Si justo tenemos un cambio local reciente esperando a mandarse a
     // Supabase (debounce de sv()), no aplicamos este valor remoto ahora:
