@@ -429,6 +429,38 @@ let ops=JSON.parse(localStorage.getItem("ft-mob-ops")||"[]");
 let agenda=JSON.parse(localStorage.getItem("ft-mob-ag")||"[]");
 let emp="tracto";
 let nT=tareas.length?Math.max(0,...tareas.map(t=>t.id))+1:1;
+// Id único de tarea.
+// ANTES era el contador nT++, y ahí estaba el problema de fondo: nT se calcula
+// como "el mayor id que haya + 1", pero cuando se cierra el día la lista queda
+// vacía y al abrir la app de nuevo arranca otra vez en 1. Las tareas de hoy
+// nacían con los MISMOS ids que las de ayer, y los dispositivos las tomaban
+// por la misma tarea: este celular veía llegar "la tarea 1" de hoy, encontraba
+// "la tarea 1" de ayer guardada acá y ya terminada, y se quedaba con la de
+// ayer — por eso volvía todo el journal del día anterior ya completado.
+// Con la marca de tiempo el número no se repite nunca, ni entre días ni entre
+// equipos. Sigue siendo un número creciente, así que Math.max(...) y las
+// comparaciones por id siguen funcionando igual.
+// Número propio de este equipo (0-999), fijo desde la primera vez. Va en las
+// últimas cifras del id para que dos equipos que cargan una tarea en el mismo
+// milisegundo no generen el mismo número.
+const SALT_EQUIPO=(function(){
+  var v=null;
+  try{v=localStorage.getItem("ft-mob-id-salt");}catch(e){}
+  if(v===null||isNaN(parseInt(v,10))){
+    v=String(Math.floor(Math.random()*1000));
+    try{localStorage.setItem("ft-mob-id-salt",v);}catch(e){}
+  }
+  return parseInt(v,10)%1000;
+})();
+let ultimoIdTarea=0;
+function nuevoIdTarea(){
+  var id=Date.now()*1000+SALT_EQUIPO;
+  // Dos tareas cargadas dentro del mismo milisegundo en este equipo: se corre
+  // el número uno más, así nunca se repite.
+  if(id<=ultimoIdTarea)id=ultimoIdTarea+1;
+  ultimoIdTarea=id;
+  return id;
+}
 let nO=ops.length?Math.max(0,...ops.map(o=>o.id))+1:1;
 let nA=agenda.length?Math.max(0,...agenda.map(a=>a.id))+1:1;
 let cronos={};
@@ -913,7 +945,7 @@ function guardarTareaMob(){
   if(!txt){toast(mtTipo==="general"&&genTarea!=="otro"?"Completá los datos de la tarea":"Ingresá una descripción","#A32D2D");return;}
   if(mtTipo==="general"&&(genTarea==="pagare"||genTarea==="rechazado")&&!bp[0]){toast("Elegí el banco","#A32D2D");return;}
   const monto=parseFloat(document.getElementById("mt-monto-mob").value)||0;
-  tareas.push({id:nT++,txt,genTarea:genTarea,
+  tareas.push({id:nuevoIdTarea(),txt,genTarea:genTarea,
     genDueno:genTarea==="pagare"?document.getElementById("mt-gen-dueno-mob").value.trim():"",
     genCant:genTarea==="rechazado"?(parseInt(document.getElementById("mt-gen-cant-mob").value,10)||0):0,
     genSolic:genTarea==="solicitud"?(document.getElementById("mt-gen-solic-mob").value==="otro"?document.getElementById("mt-gen-solic-otro-mob").value.trim():document.getElementById("mt-gen-solic-mob").value):"",pri:mtPri,st:"pend",para:"hoy",tipo:mtTipo,mon:mtTipo!=="general"?mtMon:"",inst:mtTipo!=="general"?mtInst:"",canal:mtTipo!=="general"?mtCanal:"",monto:mtTipo!=="general"?monto:0,tc:7850,banco:bp[0]||"",numcta:bp[1]||"",nom:document.getElementById("mt-nom-mob").value,obs:(document.getElementById("mt-obs-mob").value||"").trim(),emp,fecha:today()});
@@ -1451,6 +1483,15 @@ document.getElementById("fab-btn").style.display="flex";
 // dispositivo que todavía no se enteró de la finalización; aplicarlo a
 // ciegas hacía que el cronómetro final apareciera un instante y
 // desapareciera (la tarea "volvía" a en_camino/en_banco).
+// ¿La tarea local y la remota son realmente la misma? Con ids repetidos entre
+// días no alcanza con que coincida el id. Solo se responde que NO cuando hay
+// prueba de que son distintas (otra fecha, otro texto); ante la duda se asume
+// que sí, que es como se venía comportando.
+function mismaTarea(a,b){
+  if(a.fecha&&b.fecha&&a.fecha!==b.fecha)return false;
+  if(a.txt&&b.txt&&a.txt!==b.txt)return false;
+  return true;
+}
 function mergeTareasRemoto(remoto){
   var porId={};
   tareas.forEach(function(t){porId[t.id]=t;});
@@ -1459,7 +1500,10 @@ function mergeTareasRemoto(remoto){
     vistos[rt.id]=1;
     idsEnLaNube[rt.id]=1;
     var local=porId[rt.id];
-    if(local&&local.st==="done"&&(local.tCalle||local.tBanco)&&rt.st!=="done")return local;
+    // Se conserva la versión de acá SOLO si es la misma tarea. Sin este
+    // control, una tarea de ayer ya terminada pisaba a la de hoy que había
+    // heredado su id, y el journal entero volvía atrás.
+    if(local&&mismaTarea(local,rt)&&local.st==="done"&&(local.tCalle||local.tBanco)&&rt.st!=="done")return local;
     return rt;
   });
   // Tareas cargadas en este celular que la copia remota todavía no incluía.
