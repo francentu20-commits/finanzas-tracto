@@ -152,6 +152,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
   <div class="pbar"><div class="pfill" id="j-bar-mob" style="width:0%"></div></div>
   <div class="metrics">
     <div class="metric"><div class="ml">Completadas</div><div class="mv" style="color:var(--green)" id="jm-don">0</div></div>
+    <div class="metric"><div class="ml">No cumplidas</div><div class="mv" style="color:var(--amber)" id="jm-nocum">0</div></div>
     <div class="metric"><div class="ml">Pendientes</div><div class="mv" style="color:#A32D2D" id="jm-pen">0</div></div>
     <div class="metric"><div class="ml">Dep. hoy</div><div class="mv" style="color:var(--green);font-size:14px" id="jm-dep">0</div></div>
     <div class="metric"><div class="ml">Ret. hoy</div><div class="mv" style="color:#A32D2D;font-size:14px" id="jm-ret">0</div></div>
@@ -455,9 +456,12 @@ const SALT_EQUIPO=(function(){
 let ultimoIdTarea=0;
 function nuevoIdTarea(){
   var id=Date.now()*1000+SALT_EQUIPO;
-  // Dos tareas cargadas dentro del mismo milisegundo en este equipo: se corre
-  // el número uno más, así nunca se repite.
-  if(id<=ultimoIdTarea)id=ultimoIdTarea+1;
+  // Dos tareas cargadas dentro del mismo milisegundo en este equipo: se salta al
+  // milisegundo siguiente (+1000), NO al número siguiente. Corriendo de a uno,
+  // el contador podía meterse en el rango de otro equipo y volver a repetir;
+  // saltando de mil en mil, las últimas tres cifras siguen siendo siempre el
+  // número de este equipo, así que dos equipos distintos nunca coinciden.
+  if(id<=ultimoIdTarea)id=ultimoIdTarea+1000;
   ultimoIdTarea=id;
   return id;
 }
@@ -473,13 +477,28 @@ let nDp=depositos.length?Math.max(0,...depositos.map(d=>d.id))+1:1;
 let notasJ=localStorage.getItem("ft-mob-notas")||"";
 let acuseTaskId=null,acuseB64=null,acuseAgendaId=null;
 let cuentasTab="tracto";
+// Datos fiscales de cada empresa, en un solo lugar (igual que en la PC).
+const EMPRESAS={
+  tracto:{nom:"Tracto Agro Vial S.A.E.",ruc:"80027587-0"},
+  agri:{nom:"Agricultural Business S.R.L.",ruc:"80093150-5"}
+};
 // Estado de "De vuelta a la oficina" (se declara acá arriba, junto al resto
 // del estado, porque sv() lo empuja a Supabase y sv() está definido antes que
 // las funciones de la oficina).
 let oficina={activo:false,lugar:"",inicio:null,hist:[]};
 try{const guardadoOf=localStorage.getItem("ft-mob-oficina");if(guardadoOf)oficina=Object.assign(oficina,JSON.parse(guardadoOf));}catch(e){}
 
-function today(){return new Date().toISOString().split("T")[0];}
+// Fecha local en formato AAAA-MM-DD.
+// NO se usa toISOString(): eso devuelve la fecha en UTC y en Paraguay (UTC-3)
+// a partir de las 21:00 ya da el día siguiente, así que lo que se terminaba de
+// noche quedaba anotado en el día equivocado. Tiene que ser idéntico al de la
+// PC: si los dos equipos no calculan la misma fecha, las tareas y el archivo
+// del día dejan de coincidir entre ellos.
+function fechaLocal(d){
+  d=d||new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+function today(){return fechaLocal();}
 function sv(){try{localStorage.setItem("ft-mob-tar",JSON.stringify(tareas));localStorage.setItem("ft-mob-ops",JSON.stringify(ops));localStorage.setItem("ft-mob-ag",JSON.stringify(agenda));localStorage.setItem("ft-mob-depo",JSON.stringify(depositos));localStorage.setItem("ft-mob-notas",notasJ);}catch(e){console.error("[FinTracto] localStorage lleno, se sigue igual con Supabase:",e);}if(window.FDSupabase)window.FDSupabase.pushAll({tareas,ops,agenda,descuentos,depositos,notasJ,oficina});}
 // notasJ ya no tiene interfaz (se quitó "Notas del día"). Se conserva la
 // variable porque sigue sincronizándose con la PC y con días ya archivados.
@@ -609,15 +628,19 @@ function renderJournal(){
   document.getElementById("j-fecha-mob").textContent=hoy.toLocaleDateString("es-PY",{weekday:"long",day:"numeric",month:"long"});
   document.getElementById("j-emp-sub").textContent=emp==="tracto"?"Tracto Agro Vial S.A.":"Agricultural Business S.R.L.";
   const hT=tareas.filter(t=>t.para==="hoy"),mT=tareas.filter(t=>t.para==="manana");
-  const don=hT.filter(t=>t.st==="done").length,pen=hT.length-don;
+  // La no cumplida está cerrada pero NO cuenta como completada: la eficiencia
+  // del día tiene que reflejar lo que realmente se logró.
+  const don=hT.filter(esCumplida).length,noCum=hT.filter(esNoCumplida).length;
+  const pen=hT.length-don-noCum;
   const pct=hT.length?Math.round(don/hT.length*100):0;
   document.getElementById("jm-don").textContent=don;
+  document.getElementById("jm-nocum").textContent=noCum;
   document.getElementById("jm-pen").textContent=pen;
   document.getElementById("j-pct-mob").textContent=pct+"%";
   document.getElementById("j-bar-mob").style.width=pct+"%";
   // dep/ret counts
-  const depD=hT.filter(t=>t.tipo==="deposito"&&t.st==="done").length;
-  const retD=hT.filter(t=>t.tipo==="retiro"&&t.st==="done").length;
+  const depD=hT.filter(t=>t.tipo==="deposito"&&esCumplida(t)).length;
+  const retD=hT.filter(t=>t.tipo==="retiro"&&esCumplida(t)).length;
   document.getElementById("jm-dep").textContent=depD;
   document.getElementById("jm-ret").textContent=retD;
 
@@ -643,10 +666,15 @@ function renderJournal(){
         :"";
       // phase buttons
       let phaseBtns="";
+      // "No se cumplió" está disponible en cualquier momento antes de cerrar la
+      // tarea: se puede saber que no va a salir sin haber llegado al banco.
+      const noCumBtn=!isDone
+        ?`<div class="phase-btns" style="margin-top:6px"><button class="phase-btn" style="background:var(--al);color:var(--amber)" onclick="mobNoCumplida(${t.id})">⚠️ No se cumplió</button></div>`
+        :"";
       if(!isDone){
         if(t.st==="pend")phaseBtns=`<div class="phase-btns"><button class="phase-btn pb-iniciar" onclick="mobIniciar(${t.id})">🚶 Iniciar</button></div>`;
         else if(isEC)phaseBtns=`<div class="phase-btns"><button class="phase-btn pb-banco" onclick="mobBanco(${t.id})">${t.tipo==="general"?"📍 Llegué":"🏦 Llegué al banco"}</button></div>`;
-        else if(isEB)phaseBtns=`<div class="phase-btns"><button class="phase-btn pb-terminar" onclick="mobTerminar(${t.id})">✅ Terminé</button></div>`;
+        else if(isEB)phaseBtns=`<div class="phase-btns"><button class="phase-btn pb-terminar" onclick="mobTerminar(${t.id})">✅ Cumplida</button></div>`;
       }
       // Resumen final de tiempos: caja nueva, separada de la lógica del
       // cronómetro en vivo (crono-strip) — ocupa el mismo lugar apenas la
@@ -664,23 +692,35 @@ function renderJournal(){
       const obsHtml=t.obs
         ?`<div style="margin-top:6px"><button class="phase-btn" style="flex:none;width:auto;padding:6px 11px;background:var(--al);color:var(--amber);border:1px solid var(--amber)" onclick="mobToggleObs(${t.id},this)">📝 Observación</button><div id="obs-mob-${t.id}" style="display:none;margin-top:6px;background:var(--bg);border-left:3px solid var(--amber);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--tx2);white-space:pre-wrap">${t.obs}</div></div>`
         :"";
+      // El motivo de una no cumplida se ve SIEMPRE, sin desplegar nada: es
+      // justamente el dato que hay que leer de un vistazo.
+      const noCum=esNoCumplida(t);
+      const noCumTag=noCum?`<span class="tag" style="background:var(--al);color:var(--amber)">No cumplida</span>`:"";
+      const motivoHtml=(noCum&&t.motivo)
+        ?`<div style="margin-top:6px;background:var(--bg);border-left:3px solid var(--amber);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--tx2);white-space:pre-wrap"><b>No se cumplió:</b> ${t.motivo}</div>`
+        :"";
       return `<div class="task-item">
-        <div class="task-check ${isDone?"done":""}" onclick="mobCycle(${t.id})">${isDone?`<i class="ti ti-check" style="font-size:12px"></i>`:""}</div>
+        <div class="task-check ${isDone&&!noCum?"done":""}" style="${noCum?"background:var(--al);border-color:var(--amber)":""}" onclick="mobCycle(${t.id})">${isDone?`<i class="ti ${noCum?"ti-alert-triangle":"ti-check"}" style="font-size:12px;${noCum?"color:var(--amber)":""}"></i>`:""}</div>
         <div class="task-body">
-          <div class="task-txt ${isDone?"done":""}">${t.txt}</div>
+          <div class="task-txt ${isDone&&!noCum?"done":""}">${t.txt}${noCumTag}</div>
           <div class="task-meta">${tipoTag}${monTag}${bancoTag}${nomTag}${montoTag}</div>
-          ${phaseBtns}${cronoHtml}${obsHtml}${acuseBtnHtml}
+          ${phaseBtns}${noCumBtn}${cronoHtml}${motivoHtml}${obsHtml}${acuseBtnHtml}
         </div>
         <button onclick="mobDelT(${t.id})" style="border:none;background:none;color:var(--tx3);font-size:18px;padding:4px;cursor:pointer"><i class="ti ti-trash"></i></button>
       </div>`;
   }
   // Completadas: arriba de todo, sin importar la prioridad, en el orden en que
   // se fueron terminando (la primera arriba, la última abajo).
-  const hechas=hT.filter(t=>t.st==="done").sort(ordenHechas);
+  const hechas=hT.filter(esCumplida).sort(ordenHechas);
+  const noCumplidas=hT.filter(esNoCumplida).sort(ordenHechas);
   const elH=document.getElementById("j-hechas-mob");
-  elH.innerHTML=hechas.length
-    ?`<div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;padding:8px 0 4px">✅ Completadas (${hechas.length})</div>`+hechas.map(itemMob).join("")
-    :"";
+  // Las no cumplidas van en su propio grupo, debajo de las completadas.
+  elH.innerHTML=(hechas.length
+      ?`<div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;padding:8px 0 4px">✅ Completadas (${hechas.length})</div>`+hechas.map(itemMob).join("")
+      :"")
+    +(noCumplidas.length
+      ?`<div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.06em;padding:8px 0 4px">⚠️ No cumplidas (${noCumplidas.length})</div>`+noCumplidas.map(itemMob).join("")
+      :"");
   // Pendientes: abajo, agrupadas por prioridad como siempre.
   PRI.forEach(p=>{
     const items=hT.filter(t=>t.pri===p&&t.st!=="done");
@@ -718,7 +758,24 @@ function mobBanco(id){
   if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"banco",txt:t.txt,taskId:id,tCalle:fmtT(t.calleMs)});
   toast("🏦 Llegaste al banco","var(--blue)");renderJournal();
 }
-function mobTerminar(id){
+// ── Resultado de una tarea cerrada ──
+// CUMPLIDA (se hizo el trámite) o NO CUMPLIDA (se fue, pero no se pudo: el
+// banco no la tomó, faltaba un papel, estaba cerrado...). En los dos casos
+// queda st:"done" — ya no está pendiente— pero solo la cumplida suma a las
+// completadas del día. Las tareas viejas no tienen el campo y cuentan como
+// cumplidas.
+function esNoCumplida(t){return !!t&&t.st==="done"&&t.resultado==="no_cumplido";}
+function esCumplida(t){return !!t&&t.st==="done"&&t.resultado!=="no_cumplido";}
+// El motivo es obligatorio: sin el porqué escrito, la marca no sirve de nada.
+function mobNoCumplida(id){
+  const t=tareas.find(t=>t.id===id);if(!t)return;
+  let motivo=prompt("¿Por qué no se pudo cumplir «"+t.txt+"»?","");
+  if(motivo===null)return;
+  motivo=motivo.trim();
+  if(!motivo){toast("Hay que escribir el motivo","#A32D2D");return;}
+  mobTerminar(id,"no_cumplido",motivo);
+}
+function mobTerminar(id,resultado,motivo){
   const t=tareas.find(t=>t.id===id);if(!t)return;
   // Cierra la etapa que esté corriendo. La etapa se decide con faseDe() —
   // estado + cronoFase — y no con cronoFase a secas: si ese campo llegaba
@@ -733,19 +790,27 @@ function mobTerminar(id){
   t.totalMs=t.calleMs+t.bancoMs;
   const tCalle=fmtT(t.calleMs),tBanco=fmtT(t.bancoMs),tTotal=fmtT(t.totalMs);
   t.st="done";t.doneAt=Date.now();t.tCalle=tCalle;t.tBanco=tBanco;t.tTotal=tTotal;
+  t.resultado=(resultado==="no_cumplido")?"no_cumplido":"cumplido";
+  if(t.resultado==="no_cumplido"){
+    t.motivo=motivo||"";
+    t.obs=(t.obs?t.obs+" | ":"")+"No se cumplió: "+t.motivo;
+  }
   delete t.cronoInicio;delete t.cronoFase;
   limpiarAnclas(id);
-  if(t.tipo!=="general"&&t.banco&&t.monto){
+  // Una tarea NO cumplida no genera operación: el depósito o el retiro no
+  // llegó a hacerse, así que anotarlo sería inventar plata.
+  if(t.resultado!=="no_cumplido"&&t.tipo!=="general"&&t.banco&&t.monto){
     const monto=parseFloat(t.monto)||0,mon=t.mon||"GS",tc=7850;
     ops.push({id:nO++,tipo:t.tipo,emp,mon,monto,tc,enGs:mon==="USD"?Math.round(monto*tc):monto,banco:t.banco,nom:t.nom||t.txt,fecha:today()});nO++;
   }
   const agId=nA;
-  agenda.push({id:nA++,txt:t.txt,tipo:t.tipo,pri:t.pri,mon:t.mon,monto:t.monto,banco:t.banco,nom:t.nom,fecha:today(),completada:today(),tCalle,tBanco,tTotal,calleMs:t.calleMs,bancoMs:t.bancoMs,totalMs:t.totalMs,startedAt:t.startedAt||0,doneAt:t.doneAt||0,obs:t.obs||"",asignado:t.asignado||""});nA++;
+  agenda.push({id:nA++,txt:t.txt,tipo:t.tipo,pri:t.pri,mon:t.mon,monto:t.monto,banco:t.banco,nom:t.nom,fecha:today(),completada:today(),tCalle,tBanco,tTotal,calleMs:t.calleMs,bancoMs:t.bancoMs,totalMs:t.totalMs,startedAt:t.startedAt||0,doneAt:t.doneAt||0,obs:t.obs||"",asignado:t.asignado||"",resultado:t.resultado||"cumplido",motivo:t.motivo||""});nA++;
   t.agendaId=agId; // para que el botón "Agregar acuse" (opcional, se toca cuando quieras) sepa a qué registro del historial ligar la foto
   sv();
-  if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"completada",txt:t.txt,taskId:id,tCalle,tBanco,tTotal,calleMs:t.calleMs,bancoMs:t.bancoMs,totalMs:t.totalMs});
+  if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"completada",txt:t.txt,taskId:id,tCalle,tBanco,tTotal,calleMs:t.calleMs,bancoMs:t.bancoMs,totalMs:t.totalMs,resultado:t.resultado,motivo:t.motivo||""});
   renderJournal();
-  toast("✅ Tarea completada — Calle: "+tCalle+" | Banco: "+tBanco+" | Total: "+tTotal,"var(--green)");
+  if(t.resultado==="no_cumplido")toast("⚠️ Marcada como NO cumplida — "+t.motivo,"var(--amber)");
+  else toast("✅ Tarea completada — Calle: "+tCalle+" | Banco: "+tBanco+" | Total: "+tTotal,"var(--green)");
 }
 // Único intervalo compartido que repinta el reloj de CUALQUIER tarea en curso,
 // la haya iniciado este celular, la PC, u otro dispositivo.
@@ -856,7 +921,7 @@ setInterval(function(){
 function mobCycle(id){
   const t=tareas.find(t=>t.id===id);if(!t)return;
   if(t.st==="en_camino"||t.st==="en_banco")return;
-  if(t.st==="done"){t.st="pend";delete t.doneAt;sv();renderJournal();return;}
+  if(t.st==="done"){t.st="pend";delete t.doneAt;delete t.resultado;delete t.motivo;sv();renderJournal();return;}
   if(t.tipo==="general"){mobIniciar(id);return;} // las tareas generales también usan el cronómetro (Iniciar → Llegué → Terminé)
   t.st="done";t.doneAt=Date.now();
   const agId2=nA;
@@ -1456,7 +1521,15 @@ function renderDescuentosList(){
 function setCuentasTab(tab){cuentasTab=tab;document.getElementById("cta-btn-t").className="seg-opt"+(tab==="tracto"?" on":"");document.getElementById("cta-btn-a").className="seg-opt"+(tab==="agri"?" on":"");renderCuentas();}
 function renderCuentas(){
   const cols=["#185FA5","#1D9E75","#D85A30","#854F0B","#534AB7","#A32D2D","#085041","#0F6E56","#3C3489","#3B6D11","#0C447C","#993C1D","#415FA5","#4D9E75"];
-  document.getElementById("mob-ctas-lista").innerHTML=CTAS[cuentasTab].map((c,i)=>`
+  const E=EMPRESAS[cuentasTab]||EMPRESAS.tracto;
+  // El RUC de la empresa encabeza la lista, con el mismo formato que las
+  // cuentas de abajo para poder leerlo (y copiarlo) de un vistazo.
+  document.getElementById("mob-ctas-lista").innerHTML=`
+    <div class="banco-card" style="border-left-color:${cuentasTab==="tracto"?"#185FA5":"#1D9E75"}">
+      <div class="banco-name">${E.nom}</div>
+      <div class="cta-row"><span class="cta-mon cta-gs">RUC</span><span class="cta-num" style="font-weight:700;font-size:14px;letter-spacing:.5px">${E.ruc}</span></div>
+      <div style="font-size:11px;color:var(--tx2);margin-top:6px">${CTAS[cuentasTab].length} bancos</div>
+    </div>`+CTAS[cuentasTab].map((c,i)=>`
     <div class="banco-card" style="border-left-color:${cols[i%cols.length]}">
       <div class="banco-name">${c.b}</div>
       <div class="cta-row"><span class="cta-mon cta-gs">Gs.</span><span class="cta-num">${c.gs}</span></div>
