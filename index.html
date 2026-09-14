@@ -797,12 +797,11 @@ function mobTerminar(id,resultado,motivo){
   }
   delete t.cronoInicio;delete t.cronoFase;
   limpiarAnclas(id);
-  // Una tarea NO cumplida no genera operación: el depósito o el retiro no
-  // llegó a hacerse, así que anotarlo sería inventar plata.
-  if(t.resultado!=="no_cumplido"&&t.tipo!=="general"&&t.banco&&t.monto){
-    const monto=parseFloat(t.monto)||0,mon=t.mon||"GS",tc=7850;
-    ops.push({id:nO++,tipo:t.tipo,emp,mon,monto,tc,enGs:mon==="USD"?Math.round(monto*tc):monto,banco:t.banco,nom:t.nom||t.txt,fecha:today()});nO++;
-  }
+  // La operación del Resumen del día la registra la PC, y SOLO la PC: cuando le
+  // llega esta tarea terminada, sincronizarOpsDeTareas() la da de alta con su
+  // tareaId (y no la registra si la tarea no se cumplió). Antes el celular
+  // TAMBIÉN la registraba acá, pero sin tareaId, y la PC no la reconocía como
+  // la misma: cada depósito terminado en el celular salía dos veces.
   const agId=nA;
   agenda.push({id:nA++,txt:t.txt,tipo:t.tipo,pri:t.pri,mon:t.mon,monto:t.monto,banco:t.banco,nom:t.nom,fecha:today(),completada:today(),tCalle,tBanco,tTotal,calleMs:t.calleMs,bancoMs:t.bancoMs,totalMs:t.totalMs,startedAt:t.startedAt||0,doneAt:t.doneAt||0,obs:t.obs||"",asignado:t.asignado||"",resultado:t.resultado||"cumplido",motivo:t.motivo||""});nA++;
   t.agendaId=agId; // para que el botón "Agregar acuse" (opcional, se toca cuando quieras) sepa a qué registro del historial ligar la foto
@@ -950,7 +949,7 @@ function openModalTarea(){
   setTimeout(()=>document.getElementById("mt-txt-mob").focus(),200);
 }
 function closeMobModal(){document.getElementById("modal-mob-tarea").classList.remove("open");}
-function setMTipo(t,el){mtTipo=t;document.querySelectorAll("#mseg-tipo .seg-opt").forEach(b=>b.className="seg-opt");el.className="seg-opt "+(t==="deposito"?"on-g":t==="retiro"?"on-r":"on");document.getElementById("mt-op-mob").style.display=t!=="general"?"block":"none";document.getElementById("mt-banco-lbl-mob").textContent=t==="general"?"¿A qué banco vas? (opcional)":"Banco";fillBancosMob();setGenTareaMob();}
+function setMTipo(t,el){mtTipo=t;document.querySelectorAll("#mseg-tipo .seg-opt").forEach(b=>b.className="seg-opt");el.className="seg-opt "+(t==="deposito"?"on-g":t==="retiro"?"on-r":"on");document.getElementById("mt-op-mob").style.display=t!=="general"?"block":"none";document.getElementById("mt-banco-lbl-mob").textContent=t==="general"?"¿A qué banco vas? (opcional)":"Banco";fillBancosMob(true);setGenTareaMob();}
 // Muestra los campos que corresponden al trámite elegido (ver la versión de PC).
 function setGenTareaMob(){
   const esGen=mtTipo==="general";
@@ -986,12 +985,19 @@ function textoGenTareaMob(banco){
   return "";
 }
 function setMPri(p,el){mtPri=p;document.querySelectorAll("#mseg-pri .seg-opt").forEach(b=>b.className="seg-opt");el.className="seg-opt "+(p==="alta"?"on-r":p==="media"?"":"on-g");}
-function setMMon(m,el){mtMon=m;document.querySelectorAll("#mseg-mon .seg-opt").forEach(b=>b.className="seg-opt");el.className="seg-opt on";fillBancosMob();}
+function setMMon(m,el){mtMon=m;document.querySelectorAll("#mseg-mon .seg-opt").forEach(b=>b.className="seg-opt");el.className="seg-opt on";fillBancosMob(true);}
 function setMInst(i,el){mtInst=i;document.querySelectorAll("#mseg-inst .seg-opt").forEach(b=>b.className="seg-opt");el.className="seg-opt on";}
 function setMCanal(c,el){mtCanal=c;document.querySelectorAll("#mseg-canal .seg-opt").forEach(b=>b.className="seg-opt");el.className="seg-opt on";}
 // En las tareas generales solo el nombre del banco (ver la nota en la PC).
-function fillBancosMob(){
+function fillBancosMob(conservar){
   const sel=document.getElementById("mt-banco-mob");if(!sel)return;
+  // Si se está cambiando tipo o moneda con el formulario abierto, se vuelve a
+  // elegir el mismo banco en la lista nueva. Antes la lista se rearmaba y la
+  // selección volvía sola a "No aplica": elegir el banco y DESPUÉS tocar GS/USD
+  // guardaba el depósito sin banco — la tarjeta no mostraba ningún dato y la
+  // operación no se registraba. Al abrir una tarea nueva NO se conserva nada,
+  // para no arrastrar el banco de la tarea anterior.
+  const antes=(sel.value||"").split("|")[0];
   if(mtTipo==="general"){
     const vistos={},nombres=[];
     CTAS[emp].forEach(c=>{if(!vistos[c.b]){vistos[c.b]=1;nombres.push(c.b);}});
@@ -1000,6 +1006,10 @@ function fillBancosMob(){
     sel.innerHTML='<option value="">No aplica / entrega no bancaria</option>'+CTAS[emp].filter(c=>mtMon==="GS"||(c.usd&&c.usd!=="-")).map(c=>`<option value="${c.b}|${mtMon==="GS"?c.gs:c.usd}">${c.b} — ${mtMon==="GS"?c.gs:c.usd}</option>`).join("");
   }
   document.getElementById("mt-cta-mob").style.display="none";
+  if(conservar&&antes){
+    for(let i=0;i<sel.options.length;i++){if(sel.options[i].value.split("|")[0]===antes){sel.selectedIndex=i;break;}}
+    mobMostrarCta();
+  }
 }
 function mobMostrarCta(){const v=document.getElementById("mt-banco-mob").value;if(mtTipo==="general"||!v){document.getElementById("mt-cta-mob").style.display="none";return;}document.getElementById("mt-numcta-mob").value=v.split("|")[1]||"";document.getElementById("mt-cta-mob").style.display="block";}
 function guardarTareaMob(){
@@ -1010,6 +1020,10 @@ function guardarTareaMob(){
   if(!txt){toast(mtTipo==="general"&&genTarea!=="otro"?"Completá los datos de la tarea":"Ingresá una descripción","#A32D2D");return;}
   if(mtTipo==="general"&&(genTarea==="pagare"||genTarea==="rechazado")&&!bp[0]){toast("Elegí el banco","#A32D2D");return;}
   const monto=parseFloat(document.getElementById("mt-monto-mob").value)||0;
+  // Depósito y retiro sin banco o sin monto no sirven: la operación no se
+  // registra y la tarjeta queda sin datos. Así se guardó "Depósito sudameris".
+  if(mtTipo!=="general"&&!bp[0]){toast("Elegí el banco","#A32D2D");return;}
+  if(mtTipo!=="general"&&!(monto>0)){toast("Ingresá el monto","#A32D2D");return;}
   tareas.push({id:nuevoIdTarea(),txt,genTarea:genTarea,
     genDueno:genTarea==="pagare"?document.getElementById("mt-gen-dueno-mob").value.trim():"",
     genCant:genTarea==="rechazado"?(parseInt(document.getElementById("mt-gen-cant-mob").value,10)||0):0,
@@ -1606,7 +1620,10 @@ function mergeTareasRemoto(remoto){
 // "fd-desc" y "fd-depo" quedan afuera a propósito: la PC las vacía cuando
 // importa los cheques escaneados, y ese vaciado sí tiene que llegar.
 // ============================================================
-const COLECCIONES_PROTEGIDAS={"fd-tar":"tareas","fd-ops":"operaciones","fd-agenda":"agenda"};
+// Solo las tareas. Operaciones y agenda las lleva la PC: si el celular las
+// "protegía" y volvía a subir su copia, peleaba con la limpieza de duplicados de
+// la PC y las operaciones repetidas volvían una y otra vez.
+const COLECCIONES_PROTEGIDAS={"fd-tar":"tareas"};
 // Ids de tareas de las que consta que están (o estuvieron) guardadas en la
 // nube: las que vinieron en alguna lectura remota y las que este celular subió
 // con éxito. Ver mergeTareasRemoto().
@@ -1657,40 +1674,74 @@ function localDeClave(key){
   if(key==="fd-agenda")return agenda;
   return null;
 }
-function borradoRemotoSospechoso(key,local,remoto){
-  if(!COLECCIONES_PROTEGIDAS[key])return false;
-  var nL=nEl(local),nR=nEl(remoto);
-  if(nL===0)return false;          // acá no hay nada que perder
-  // Vaciado total. Se acepta solo si acá quedaba UNA sola: eso es el borrado
-  // normal de la ultima tarea hecho desde otro dispositivo. Que desaparezcan
-  // dos o mas de un saque no es trabajo, es un equipo sin los datos buenos.
-  if(nR===0)return nL>=2;
-  // Desaparece más de la mitad y al menos 3 elementos de una sola vez. Borrar
-  // de a uno (mobDelT, terminar una tarea) pasa sin freno, que es lo normal.
-  return (nL-nR)>=3&&nR*2<=nL;
+// Ids de tareas que la PC archivó al cerrar un día. Llegan por la nube como
+// "fd-cierre": con eso el celular sabe que esas tareas salieron de la lista
+// porque se archivaron, y no porque alguien las borró.
+const cierreIds=Object.create(null);
+function sumarCierre(v){
+  (v&&Array.isArray(v.ids)?v.ids:[]).forEach(function(id){cierreIds[id]=1;});
 }
-// Vuelve a subir el estado bueno de este celular después de frenar un borrado,
-// así la nube no queda vacía para el resto de los dispositivos.
+// Tareas que un envío remoto haría desaparecer de acá SIN explicación.
+// No cuentan: las que vienen en el envío, las archivadas en un cierre de día, y
+// las ya terminadas en un día anterior. Lo que queda es lo que un borrado por
+// error se llevaría.
+//
+// ANTES el escudo solo comparaba cantidades, y eso no distingue un cambio de
+// día de un borrado: con 7 tareas de ayer guardadas acá, las 3 de hoy que traía
+// la nube parecían un borrado masivo; el celular lo frenaba y SUBÍA su copia
+// vieja, pisando lo de hoy en la PC.
+function tareasPerdidas(remoto){
+  var enRemoto={};(remoto||[]).forEach(function(t){if(t&&t.id!=null)enRemoto[t.id]=1;});
+  var hoyF=today();
+  return tareas.filter(function(t){
+    if(!t||t.id==null||enRemoto[t.id])return false;
+    if(cierreIds[t.id])return false;
+    if(t.st==="done"&&t.doneAt&&fechaLocal(new Date(t.doneAt))<hoyF)return false;
+    return true;
+  });
+}
+function borradoRemotoSospechoso(key,local,remoto){
+  if(key!=="fd-tar")return false;
+  var perdidas=tareasPerdidas(remoto).length;
+  if(perdidas<2)return false;                 // borrar de a una es lo normal
+  if(nEl(remoto)===0)return true;             // vaciado total
+  return perdidas>=3&&perdidas*2>=nEl(local);
+}
+// Lista a quedarse cuando la nube se habría llevado trabajo de hoy: lo que trae
+// la nube más las tareas que se iban a perder. NO la lista local tal cual, que
+// podría arrastrar tareas viejas ya archivadas.
+function rescatarTareas(remoto){
+  var perdidas=tareasPerdidas(remoto);
+  var base=mergeTareasRemoto(remoto);
+  var ya={};base.forEach(function(t){if(t&&t.id!=null)ya[t.id]=1;});
+  perdidas.forEach(function(t){if(!ya[t.id])base.push(t);});
+  return base;
+}
 function restaurarEnLaNube(){
   if(window.FDSupabase&&window.FDSupabase.estaListoParaEscribir())
     window.FDSupabase.pushAll({tareas,ops,agenda,descuentos,depositos,notasJ,oficina});
 }
-// Devuelve true si el cambio remoto se descarta (y entonces NO hay que
-// aplicarlo). El aviso sale en pantalla, no solo en la consola.
-function escudoBorrado(key,value){
-  var local=localDeClave(key);
-  if(!borradoRemotoSospechoso(key,local,value))return false;
-  var nombre=COLECCIONES_PROTEGIDAS[key];
-  console.error("[FinTracto] Cambio remoto descartado en '"+key+"': dejaría "+nEl(value)+" de "+nEl(local)+" "+nombre+".");
-  toast("⚠️ Otro dispositivo mandó la lista de "+nombre+" vacía. NO se borró nada acá.","#A32D2D");
-  restaurarEnLaNube();
-  return true;
+// Resincroniza sin pisar un envío propio que todavía está saliendo.
+function ftResyncSeguro(intento){
+  intento=intento||0;
+  if(window.FDSupabase&&window.FDSupabase.hasPendingPush()&&intento<10){
+    setTimeout(function(){ftResyncSeguro(intento+1);},500);return;
+  }
+  ftResyncMob();
 }
 // Aplica un cambio recibido desde otro dispositivo (p.ej. una orden nueva
 // creada en la PC) al estado en memoria de esta app.
 function applyRemoteChangeMob(key,value){
   if(value==null)return;
-  if(escudoBorrado(key,value))return;
+  if(key==="fd-cierre"){sumarCierre(value);return;}
+  // Una lista de tareas que se llevaría trabajo de hoy no se aplica en el acto:
+  // el aviso de qué se archivó puede venir llegando por detrás. Se espera un
+  // momento y se decide con una lectura completa.
+  if(key==="fd-tar"&&borradoRemotoSospechoso("fd-tar",tareas,value)){
+    console.warn("[FinTracto] Lista de tareas remota sospechosa; se revisa con una lectura completa.");
+    setTimeout(ftResyncSeguro,4000);
+    return;
+  }
   if(key==="fd-tar"){
     const idsAntes=new Set(tareas.map(t=>t.id));
     const nuevas=value.filter(t=>!idsAntes.has(t.id));
@@ -1751,9 +1802,24 @@ async function ftResyncMob(){
   const remote=await window.FDSupabase.loadAll();
   if(!remote)return false;
   let hubo=false;
-  if(remote["fd-tar"]!=null&&!escudoBorrado("fd-tar",remote["fd-tar"])){tareas=mergeTareasRemoto(remote["fd-tar"]);hubo=true;}
-  if(remote["fd-ops"]!=null&&!escudoBorrado("fd-ops",remote["fd-ops"])){ops=remote["fd-ops"];hubo=true;}
-  if(remote["fd-agenda"]!=null&&!escudoBorrado("fd-agenda",remote["fd-agenda"])){agenda=remote["fd-agenda"];hubo=true;}
+  // Qué tareas se archivaron: ANTES de mirar la lista, para no confundir un
+  // cierre de día con un borrado.
+  if(remote["fd-cierre"]!=null)sumarCierre(remote["fd-cierre"]);
+  var rescate=false;
+  if(remote["fd-tar"]!=null){
+    if(borradoRemotoSospechoso("fd-tar",tareas,remote["fd-tar"])){
+      var nPerd=tareasPerdidas(remote["fd-tar"]).length;
+      tareas=rescatarTareas(remote["fd-tar"]);
+      rescate=true;
+      console.error("[FinTracto] La nube se llevaba "+nPerd+" tareas de hoy; se rescataron.");
+      toast("⚠️ La nube llegó sin "+nPerd+" tareas de hoy que están en este celular. Se conservaron.","#A32D2D");
+    }else{
+      tareas=mergeTareasRemoto(remote["fd-tar"]);
+    }
+    hubo=true;
+  }
+  if(remote["fd-ops"]!=null){ops=remote["fd-ops"];hubo=true;}
+  if(remote["fd-agenda"]!=null){agenda=remote["fd-agenda"];hubo=true;}
   if(remote["fd-desc"]!=null){descuentos=remote["fd-desc"];hubo=true;}
   if(remote["fd-depo"]!=null){depositos=remote["fd-depo"];hubo=true;}
   if(remote["fd-notas"]!=null&&remote["fd-notas"]!==""){notasJ=remote["fd-notas"];hubo=true;}
@@ -1764,6 +1830,7 @@ async function ftResyncMob(){
   nD=descuentos.length?Math.max(0,...descuentos.map(d=>d.id))+1:1;
   nDp=depositos.length?Math.max(0,...depositos.map(d=>d.id))+1:1;
   if(hubo){localStorage.setItem("ft-mob-tar",JSON.stringify(tareas));localStorage.setItem("ft-mob-ops",JSON.stringify(ops));localStorage.setItem("ft-mob-ag",JSON.stringify(agenda));localStorage.setItem("ft-mob-desc",JSON.stringify(descuentos));localStorage.setItem("ft-mob-depo",JSON.stringify(depositos));localStorage.setItem("ft-mob-notas",notasJ);localStorage.setItem("ft-mob-oficina",JSON.stringify(oficina));}
+  if(rescate)restaurarEnLaNube();
   renderJournal();renderOficinaMob();
   if(document.getElementById("desc-lista"))renderDescuentosList();
   if(document.getElementById("depo-lista"))renderDepositosList();
