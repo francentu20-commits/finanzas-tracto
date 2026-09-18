@@ -134,6 +134,8 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
   <div class="app-title">
     <svg width="26" height="26" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#F5C200"/><circle cx="145" cy="330" r="90" fill="#1a1a1a"/><circle cx="145" cy="330" r="50" fill="#eee"/><circle cx="145" cy="330" r="22" fill="#1a1a1a"/><circle cx="355" cy="345" r="55" fill="#1a1a1a"/><circle cx="355" cy="345" r="28" fill="#eee"/><rect x="110" y="180" width="290" height="120" rx="18" fill="#1a1a1a"/><rect x="270" y="110" width="130" height="100" rx="18" fill="#1a1a1a"/><rect x="278" y="118" width="114" height="76" rx="10" fill="#a8d8f0" opacity=".85"/></svg>
     Finanzas Tracto
+    <!-- Versión visible. Tiene que coincidir en la PC, en el celular y en el CACHE de sw.js del celular: si alguno dice otro número, ese equipo no tiene la última versión. Se sube junto con cada cambio. -->
+    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v42</span>
   </div>
   <button class="emp-switch" onclick="toggleEmp()" id="emp-btn">Tracto</button>
 </div>
@@ -343,24 +345,46 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
          cada uno pide sus propios datos (mismo criterio que en la PC). -->
     <div id="mt-gen-mob" style="display:none">
       <div class="fgrp"><span class="flabel">Tarea</span>
+        <div style="position:relative;margin-bottom:4px"><i class="ti ti-search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--tx2);pointer-events:none"></i><input class="fi" id="mt-gen-buscar-mob" placeholder="Buscar tarea…" autocomplete="off" oninput="buscarTareaGenMob()" style="padding-left:30px"></div><div id="mt-gen-buscar-aviso-mob" style="display:none;font-size:12px;margin-bottom:4px"></div>
         <select class="fi" id="mt-gen-tarea-mob" onchange="setGenTareaMob()">
-          <option value="pagare">📄 Retirar pagaré</option>
-          <option value="rechazado">🚫 Retirar cheque rechazado</option>
-          <option value="solicitud">📋 Entregar solicitud</option>
-          <option value="otro">✏️ Otros (escribir a mano)</option>
+          <optgroup label="Otros">
+            <option value="otro">Otra tarea (escribir a mano)</option>
+          </optgroup>
+          <optgroup label="Retiros">
+            <option value="pagare">Retiro de pagaré</option>
+            <option value="rechazado" data-busca="devuelto">Retiro de cheque rechazado</option>
+            <option value="chequera" data-busca="talonario">Retiro de chequera</option>
+          </optgroup>
+          <optgroup label="Entregas">
+            <option value="solicitud" data-busca="prestamo retencion">Entrega de solicitud</option>
+            <option value="ddjj" data-busca="ddjj">Entrega de declaración jurada</option>
+            <option value="recibo">Entrega de recibo de dinero</option>
+          </optgroup>
+          <optgroup label="Pagos">
+            <option value="ande" data-busca="luz electricidad">Pago de factura ANDE</option>
+            <option value="copaco" data-busca="telefono internet linea">Pago de factura COPACO</option>
+          </optgroup>
+          <optgroup label="Operaciones bancarias">
+            <option value="descuento">Descuento de cheques</option>
+            <option value="cartera">Operación de compra de cartera</option>
+          </optgroup>
         </select>
       </div>
     </div>
-    <div class="fgrp" id="mt-gen-dueno-box-mob" style="display:none"><span class="flabel">Dueño del pagaré</span><input class="fi" id="mt-gen-dueno-mob" placeholder="Ej: Don Artigas"></div>
-    <div class="fgrp" id="mt-gen-cant-box-mob" style="display:none"><span class="flabel">Cantidad de cheques</span><input class="fi" type="number" min="1" id="mt-gen-cant-mob" placeholder="1" inputmode="numeric"></div>
+    <div class="fgrp" id="mt-gen-dueno-box-mob" style="display:none"><span class="flabel">Dueños de los pagarés</span><div id="mt-duenos-mob"></div><button class="phase-btn" type="button" style="flex:none;width:auto;padding:8px 12px" onclick="agregarFilaGenMob('dueno')">+ Agregar otro pagaré</button></div>
+    <div class="fgrp" id="mt-gen-imp-box-mob" style="display:none"><span class="flabel">Importe de cada cheque</span><div id="mt-cheques-mob"></div><button class="phase-btn" type="button" style="flex:none;width:auto;padding:8px 12px" onclick="agregarFilaGenMob('cheque')">+ Agregar otro cheque</button></div>
     <div class="fgrp" id="mt-gen-solic-box-mob" style="display:none"><span class="flabel">Tipo de solicitud</span>
       <select class="fi" id="mt-gen-solic-mob" onchange="setGenTareaMob()">
         <option value="Préstamo">Préstamo</option>
-        <option value="otro">Otros (escribir a mano)</option>
+        <option value="Retención de cheque">Retención de cheque</option>
+        <option value="otro">Otra (escribir a mano)</option>
       </select>
     </div>
     <div class="fgrp" id="mt-gen-solic-otro-box-mob" style="display:none"><span class="flabel">¿Solicitud de qué?</span><input class="fi" id="mt-gen-solic-otro-mob" placeholder="Escribí el tipo de solicitud..."></div>
+    <div class="fgrp" id="mt-gen-destino-box-mob" style="display:none"><span class="flabel">¿Dónde o a quién se entrega?</span><input class="fi" id="mt-gen-destino-mob" placeholder="Ej: oficina de Agrosilo S.A."></div>
+    <div class="fgrp" id="mt-gen-importe-box-mob" style="display:none"><span class="flabel">Importe <span style="font-weight:400;color:var(--tx2)">(opcional)</span></span><input class="fi" type="number" min="0" id="mt-gen-importe-mob" placeholder="0" inputmode="numeric"></div>
     <div class="fgrp" id="mt-txt-box-mob"><span class="flabel">Descripción</span><input class="fi" id="mt-txt-mob" placeholder="Ej: Depositar cheque en Itaú..."></div>
+    <div class="fgrp" id="mt-vista-box-mob" style="display:none"><span class="flabel">Se va a guardar como</span><div class="fi" id="mt-vista-mob" style="background:var(--bg);color:var(--tx);font-weight:600;height:auto;min-height:34px"></div></div>
     <div class="fgrp"><span class="flabel">Observación <span style="font-weight:400;color:var(--tx2)">(opcional)</span></span><textarea class="fi" id="mt-obs-mob" style="min-height:56px;resize:vertical" placeholder="Comentario o aclaración de esta tarea..."></textarea></div>
     <div class="fgrp"><span class="flabel">Prioridad</span>
       <div class="seg" id="mseg-pri">
@@ -429,7 +453,6 @@ let tareas=JSON.parse(localStorage.getItem("ft-mob-tar")||"[]");
 let ops=JSON.parse(localStorage.getItem("ft-mob-ops")||"[]");
 let agenda=JSON.parse(localStorage.getItem("ft-mob-ag")||"[]");
 let emp="tracto";
-let nT=tareas.length?Math.max(0,...tareas.map(t=>t.id))+1:1;
 // Id único de tarea.
 // ANTES era el contador nT++, y ahí estaba el problema de fondo: nT se calcula
 // como "el mayor id que haya + 1", pero cuando se cierra el día la lista queda
@@ -467,7 +490,6 @@ function nuevoIdTarea(){
 }
 let nO=ops.length?Math.max(0,...ops.map(o=>o.id))+1:1;
 let nA=agenda.length?Math.max(0,...agenda.map(a=>a.id))+1:1;
-let cronos={};
 let mtTipo="deposito",mtMon="GS",mtInst="efectivo",mtCanal="ventanilla",mtPri="alta";
 let scanB64=null,ocrParsed={},ocrRaw="",scanMode="deposito",scanImgOrig=null;
 let descuentos=JSON.parse(localStorage.getItem("ft-mob-desc")||"[]");
@@ -703,7 +725,7 @@ function renderJournal(){
         <div class="task-check ${isDone&&!noCum?"done":""}" style="${noCum?"background:var(--al);border-color:var(--amber)":""}" onclick="mobCycle(${t.id})">${isDone?`<i class="ti ${noCum?"ti-alert-triangle":"ti-check"}" style="font-size:12px;${noCum?"color:var(--amber)":""}"></i>`:""}</div>
         <div class="task-body">
           <div class="task-txt ${isDone&&!noCum?"done":""}">${t.txt}${noCumTag}</div>
-          <div class="task-meta">${tipoTag}${monTag}${bancoTag}${nomTag}${montoTag}</div>
+          <div class="task-meta">${tipoTag}${monTag}${bancoTag}${nomTag}${montoTag}</div>${htmlChequesTareaMob(t)}
           ${phaseBtns}${noCumBtn}${cronoHtml}${motivoHtml}${obsHtml}${acuseBtnHtml}
         </div>
         <button onclick="mobDelT(${t.id})" style="border:none;background:none;color:var(--tx3);font-size:18px;padding:4px;cursor:pointer"><i class="ti ti-trash"></i></button>
@@ -803,7 +825,7 @@ function mobTerminar(id,resultado,motivo){
   // TAMBIÉN la registraba acá, pero sin tareaId, y la PC no la reconocía como
   // la misma: cada depósito terminado en el celular salía dos veces.
   const agId=nA;
-  agenda.push({id:nA++,txt:t.txt,tipo:t.tipo,pri:t.pri,mon:t.mon,monto:t.monto,banco:t.banco,nom:t.nom,fecha:today(),completada:today(),tCalle,tBanco,tTotal,calleMs:t.calleMs,bancoMs:t.bancoMs,totalMs:t.totalMs,startedAt:t.startedAt||0,doneAt:t.doneAt||0,obs:t.obs||"",asignado:t.asignado||"",resultado:t.resultado||"cumplido",motivo:t.motivo||""});nA++;
+  agenda.push({id:nA++,txt:t.txt,tipo:t.tipo,pri:t.pri,mon:t.mon,monto:t.monto,banco:t.banco,nom:t.nom,fecha:today(),completada:today(),tCalle,tBanco,tTotal,calleMs:t.calleMs,bancoMs:t.bancoMs,totalMs:t.totalMs,startedAt:t.startedAt||0,doneAt:t.doneAt||0,obs:t.obs||"",asignado:t.asignado||"",resultado:t.resultado||"cumplido",motivo:t.motivo||""});
   t.agendaId=agId; // para que el botón "Agregar acuse" (opcional, se toca cuando quieras) sepa a qué registro del historial ligar la foto
   sv();
   if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"completada",txt:t.txt,taskId:id,tCalle,tBanco,tTotal,calleMs:t.calleMs,bancoMs:t.bancoMs,totalMs:t.totalMs,resultado:t.resultado,motivo:t.motivo||""});
@@ -939,18 +961,76 @@ function mobMoveHoy(id){const t=tareas.find(t=>t.id===id);if(t){t.para="hoy";t.s
 function setSeg(segId,idx,cls){document.querySelectorAll("#"+segId+" .seg-opt").forEach((b,i)=>b.className="seg-opt"+(i===idx?" "+cls:""));}
 function openModalTarea(){
   mtTipo="deposito";mtMon="GS";mtInst="efectivo";mtCanal="ventanilla";mtPri="alta";
-  ["mt-txt-mob","mt-obs-mob","mt-monto-mob","mt-nom-mob","mt-gen-dueno-mob","mt-gen-cant-mob","mt-gen-solic-otro-mob"].forEach(id=>{const e=document.getElementById(id);if(e)e.value="";});
-  document.getElementById("mt-gen-tarea-mob").value="pagare";document.getElementById("mt-gen-solic-mob").value="Préstamo";setGenTareaMob();
+  ["mt-txt-mob","mt-obs-mob","mt-monto-mob","mt-nom-mob","mt-gen-solic-otro-mob","mt-gen-destino-mob","mt-gen-importe-mob"].forEach(id=>{const e=document.getElementById(id);if(e)e.value="";});
+  reiniciarFilasGenMob();
+  document.getElementById("mt-gen-tarea-mob").value="pagare";limpiarBusquedaGenMob();document.getElementById("mt-gen-solic-mob").value="Préstamo";setGenTareaMob();
   setSeg("mseg-tipo",1,"on-g");setSeg("mseg-pri",0,"on-r");setSeg("mseg-mon",0,"on");setSeg("mseg-inst",0,"on");setSeg("mseg-canal",0,"on");
   document.getElementById("mt-op-mob").style.display="block";
   document.getElementById("mt-cta-mob").style.display="none";
   fillBancosMob();
   document.getElementById("modal-mob-tarea").classList.add("open");
-  setTimeout(()=>document.getElementById("mt-txt-mob").focus(),200);
+  // El formulario abre en Depósito, donde la descripción ya no se escribe.
+  setTimeout(()=>document.getElementById("mt-monto-mob").focus(),200);
 }
 function closeMobModal(){document.getElementById("modal-mob-tarea").classList.remove("open");}
 function setMTipo(t,el){mtTipo=t;document.querySelectorAll("#mseg-tipo .seg-opt").forEach(b=>b.className="seg-opt");el.className="seg-opt "+(t==="deposito"?"on-g":t==="retiro"?"on-r":"on");document.getElementById("mt-op-mob").style.display=t!=="general"?"block":"none";document.getElementById("mt-banco-lbl-mob").textContent=t==="general"?"¿A qué banco vas? (opcional)":"Banco";fillBancosMob(true);setGenTareaMob();}
 // Muestra los campos que corresponden al trámite elegido (ver la versión de PC).
+// Un solo enganche para toda la ventana: los segmentos (tipo, moneda,
+// instrumento, canal) son botones, así que se escucha el clic —en diferido, para
+// que corra después del onclick propio— y además cualquier tecleo.
+(function(){
+  const m=document.getElementById("modal-mob-tarea");if(!m)return;
+  m.addEventListener("input",actualizarVistaPreviaMob);
+  m.addEventListener("change",actualizarVistaPreviaMob);
+  m.addEventListener("click",function(){setTimeout(actualizarVistaPreviaMob,0);});
+})();
+// ── Lupa: buscar en la lista de tareas generales ──
+// Se escribe parte del nombre ("ande", "chequera", "luz") y la lista muestra
+// solo lo que coincide, eligiendo la primera. Si no hay ninguna, se ofrece usar
+// lo escrito como "Otra tarea", así no hay que volver a tipearlo.
+function normBusquedaMob(s){return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();}
+function limpiarBusquedaGenMob(){
+  var b=document.getElementById("mt-gen-buscar-mob");if(b)b.value="";
+  var sel=document.getElementById("mt-gen-tarea-mob");
+  if(sel){
+    Array.prototype.forEach.call(sel.options,function(o){o.hidden=false;o.disabled=false;});
+    Array.prototype.forEach.call(sel.querySelectorAll("optgroup"),function(g){g.hidden=false;});
+  }
+  var a=document.getElementById("mt-gen-buscar-aviso-mob");if(a){a.style.display="none";a.textContent="";}
+}
+function buscarTareaGenMob(){
+  var escrito=document.getElementById("mt-gen-buscar-mob").value.trim(),q=normBusquedaMob(escrito);
+  var sel=document.getElementById("mt-gen-tarea-mob"),aviso=document.getElementById("mt-gen-buscar-aviso-mob");
+  if(!q){limpiarBusquedaGenMob();return;}
+  var encontradas=[];
+  Array.prototype.forEach.call(sel.options,function(o){
+    var coincide=normBusquedaMob(o.textContent+" "+(o.getAttribute("data-busca")||"")).indexOf(q)>=0;
+    o.hidden=!coincide;o.disabled=!coincide;
+    if(coincide&&o.value!=="otro")encontradas.push(o);
+  });
+  Array.prototype.forEach.call(sel.querySelectorAll("optgroup"),function(g){
+    g.hidden=!Array.prototype.some.call(g.children,function(o){return !o.hidden;});
+  });
+  aviso.style.display="block";
+  if(encontradas.length){
+    if(sel.value!==encontradas[0].value&&!encontradas.some(function(o){return o.value===sel.value;})){sel.value=encontradas[0].value;setGenTareaMob();}
+    aviso.style.color="var(--tx2)";
+    aviso.textContent=encontradas.length===1?"Encontrada: "+encontradas[0].textContent:encontradas.length+" tareas coinciden: elegí en la lista.";
+  }else{
+    var esc=escrito.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    aviso.style.color="var(--tx)";
+    aviso.innerHTML='No está en la lista. <button class="phase-btn" type="button" style="margin-left:4px;flex:none;width:auto;padding:6px 10px" onclick="usarBusquedaComoOtraMob()">Usar «'+esc+'» como otra tarea</button>';
+  }
+}
+function usarBusquedaComoOtraMob(){
+  var escrito=document.getElementById("mt-gen-buscar-mob").value.trim();
+  limpiarBusquedaGenMob();
+  document.getElementById("mt-gen-tarea-mob").value="otro";setGenTareaMob();
+  var t=document.getElementById("mt-txt-mob");
+  t.value=escrito?escrito.charAt(0).toUpperCase()+escrito.slice(1):"";
+  t.focus();
+  actualizarVistaPreviaMob();
+}
 function setGenTareaMob(){
   const esGen=mtTipo==="general";
   const g=esGen?document.getElementById("mt-gen-tarea-mob").value:"";
@@ -958,30 +1038,133 @@ function setGenTareaMob(){
   const ver=(id,cond)=>{const e=document.getElementById(id);if(e)e.style.display=cond?"block":"none";};
   ver("mt-gen-mob",esGen);
   ver("mt-gen-dueno-box-mob",g==="pagare");
-  ver("mt-gen-cant-box-mob",g==="rechazado");
+  ver("mt-gen-imp-box-mob",g==="rechazado");
   ver("mt-gen-solic-box-mob",g==="solicitud");
   ver("mt-gen-solic-otro-box-mob",g==="solicitud"&&solic==="otro");
-  ver("mt-txt-box-mob",!esGen||g==="otro");
+  ver("mt-gen-destino-box-mob",g==="recibo");
+  ver("mt-gen-importe-box-mob",TAREAS_CON_IMPORTE.indexOf(g)>=0);
+  // La descripción a mano quedó solo para "Otros": en todo lo demás —incluidos
+  // depósitos y retiros— el texto se arma solo con los datos cargados.
+  ver("mt-txt-box-mob",esGen&&g==="otro");
+  actualizarVistaPreviaMob();
   const lbl=document.getElementById("mt-banco-lbl-mob");
-  if(lbl&&esGen)lbl.textContent=(g==="pagare"||g==="rechazado")?"Banco":"¿A qué banco vas? (opcional)";
+  if(lbl&&esGen)lbl.textContent=TAREAS_CON_BANCO.indexOf(g)>=0?"Banco":"¿A qué banco vas? (opcional)";
 }
 // Arma la descripción de una tarea general con los datos cargados.
+// El texto de un depósito o un retiro se arma solo con los datos que ya se
+// cargaron —tipo, instrumento, banco, moneda, monto y nombre—, igual que en las
+// tareas generales. Antes había que escribirlo a mano y salía distinto cada vez.
+// Cheques de un depósito (se cargan en la PC, a mano o desde el Excel): lista
+// plegada en la tarjeta, para que quien va al banco sepa qué cheques lleva.
+function htmlChequesTareaMob(t){
+  const ch=(t&&Array.isArray(t.cheques))?t.cheques:[];
+  if(!ch.length)return "";
+  const esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const mon=t.mon||"GS";
+  return `<details style="margin-top:6px;font-size:12px"><summary style="cursor:pointer;color:var(--tx2)">🧾 ${ch.length} cheque${ch.length>1?"s":""}</summary>`
+    +`<div style="margin-top:4px;display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px">`
+    +ch.map(c=>`<span>${esc(c.nro||"—")}</span><span style="color:var(--tx2)">${esc(c.banco||"")}</span><span style="text-align:right">${fM(c.monto||0,mon)}</span>`).join("")
+    +`</div></details>`;
+}
+function textoDepRetMob(banco){
+  const monto=parseFloat(document.getElementById("mt-monto-mob").value)||0;
+  const nom=(document.getElementById("mt-nom-mob").value||"").trim();
+  return (mtTipo==="deposito"?"Depósito":"Retiro")
+    +(mtInst==="cheque"?" de cheques":" en efectivo")
+    +(banco?" — "+banco:"")
+    +(monto>0?" · "+fM(monto,mtMon):"")
+    +(nom?" · "+nom:"");
+}
+// Muestra en el formulario el texto que se va a guardar, para no confirmar a ciegas.
+function actualizarVistaPreviaMob(){
+  const box=document.getElementById("mt-vista-box-mob");if(!box)return;
+  // En "Otros" el texto lo escribe la persona, así que no hay nada que anticipar.
+  const g=mtTipo==="general"?document.getElementById("mt-gen-tarea-mob").value:"";
+  const mostrar=mtTipo!=="general"||g!=="otro";
+  box.style.display=mostrar?"block":"none";
+  if(!mostrar)return;
+  const bp=(document.getElementById("mt-banco-mob").value||"").split("|");
+  document.getElementById("mt-vista-mob").textContent=mtTipo==="general"?textoGenTareaMob(bp[0]||""):textoDepRetMob(bp[0]||"");
+}
+// ── Varios pagarés / varios cheques en una misma tarea ──
+// Cada pagaré y cada cheque rechazado tiene su fila: la primera siempre está y
+// con el botón se agregan las que hagan falta. En los cheques va el IMPORTE de
+// cada uno (antes el celular pedía "cantidad"), y el texto de la tarea suma el
+// total solo.
+const FILAS_GEN_MOB={dueno:{cont:"mt-duenos-mob",tipo:"text",ph:"Ej: Don Artigas"},cheque:{cont:"mt-cheques-mob",tipo:"number",ph:"Importe"}};
+function agregarFilaGenMob(cual,valor){
+  var cfg=FILAS_GEN_MOB[cual],cont=document.getElementById(cfg.cont);if(!cont)return;
+  var fila=document.createElement("div");
+  fila.style.cssText="display:flex;gap:4px;margin-bottom:4px";
+  var inp=document.createElement("input");
+  inp.className="fi";inp.type=cfg.tipo;inp.placeholder=cfg.ph;inp.value=valor||"";
+  if(cfg.tipo==="number"){inp.min="0";inp.step="any";inp.inputMode="numeric";}
+  var quitar=document.createElement("button");
+  quitar.className="btn";quitar.type="button";quitar.textContent="\u2715";quitar.title="Quitar";
+  quitar.onclick=function(){
+    fila.remove();
+    if(!cont.children.length)agregarFilaGenMob(cual);   // siempre queda al menos una
+    actualizarVistaPreviaMob();
+  };
+  fila.appendChild(inp);fila.appendChild(quitar);
+  cont.appendChild(fila);
+  actualizarVistaPreviaMob();
+}
+function valoresGenMob(cual){
+  var cont=document.getElementById(FILAS_GEN_MOB[cual].cont);
+  if(!cont)return [];
+  return Array.prototype.map.call(cont.querySelectorAll("input"),function(i){return (i.value||"").trim();});
+}
+function reiniciarFilasGenMob(){
+  ["mt-duenos-mob","mt-cheques-mob"].forEach(function(id){var c=document.getElementById(id);if(c)c.innerHTML="";});
+  agregarFilaGenMob("dueno");agregarFilaGenMob("cheque");
+}
+// "Artigas", "Artigas y Hermes", "Artigas, Hermes y Fernando"
+function listaEnTextoMob(a){
+  if(a.length<=1)return a[0]||"";
+  return a.slice(0,-1).join(", ")+" y "+a[a.length-1];
+}
+// Tareas generales. Una sola lista, ordenada por secciones (Retiros, Entregas,
+// Pagos, Operaciones bancarias, Otros). Cada tipo pide solo lo que necesita:
+// las que se hacen en un banco exigen el banco, y los pagos y operaciones
+// llevan un importe opcional. El texto de la tarea se arma solo, en forma
+// formal ("Retiro de…", "Entrega de…", "Pago de…").
+var TAREAS_CON_BANCO=["pagare","rechazado","chequera","descuento","cartera"];
+var TAREAS_CON_IMPORTE=["ande","copaco","descuento","cartera"];
 function textoGenTareaMob(banco){
   const g=document.getElementById("mt-gen-tarea-mob").value;
   if(g==="otro")return document.getElementById("mt-txt-mob").value.trim();
   if(g==="pagare"){
-    const d=document.getElementById("mt-gen-dueno-mob").value.trim();
-    return "Retirar pagaré"+(d?" de "+d:"")+(banco?" — "+banco:"");
+    const duenos=valoresGenMob("dueno"),conNombre=duenos.filter(Boolean),n=Math.max(1,duenos.length);
+    return (n>1?"Retiro de "+n+" pagarés":"Retiro de pagaré")
+      +(conNombre.length?" de "+listaEnTextoMob(conNombre):"")+(banco?" — "+banco:"");
   }
   if(g==="rechazado"){
-    const c=parseInt(document.getElementById("mt-gen-cant-mob").value,10)||0;
-    return "Retirar "+(c>1?c+" cheques rechazados":"cheque rechazado")+(banco?" — "+banco:"");
+    // Va el IMPORTE de cada cheque, no la cantidad: lo que interesa al salir a
+    // retirarlos es por cuánto están. La cantidad sale sola de las filas.
+    const imps=valoresGenMob("cheque"),n=Math.max(1,imps.length);
+    const total=imps.reduce((a,v)=>a+(parseFloat(v)||0),0);
+    return "Retiro de "+(n>1?n+" cheques rechazados":"cheque rechazado")
+      +(banco?" — "+banco:"")+(total>0?" · "+fM(total,""):"");
   }
   if(g==="solicitud"){
     let x=document.getElementById("mt-gen-solic-mob").value;
     if(x==="otro")x=document.getElementById("mt-gen-solic-otro-mob").value.trim();
-    return "Entregar solicitud"+(x?" de "+x:"")+(banco?" — "+banco:"");
+    // En el texto el tipo va en minúscula: "Entrega de solicitud de préstamo".
+    if(x==="Préstamo"||x==="Retención de cheque")x=x.charAt(0).toLowerCase()+x.slice(1);
+    return "Entrega de solicitud"+(x?" de "+x:"")+(banco?" — "+banco:"");
   }
+  let conImporte=function(t){let imp=(parseFloat(document.getElementById("mt-gen-importe-mob").value)||0);return t+(imp>0?" · "+fM(imp,""):"");};
+  if(g==="chequera")return "Retiro de chequera"+(banco?" — "+banco:"");
+  if(g==="ddjj")return "Entrega de declaración jurada"+(banco?" — "+banco:"");
+  if(g==="recibo"){
+    let dest=document.getElementById("mt-gen-destino-mob").value.trim();
+    return "Entrega de recibo de dinero"+(dest?" — "+dest:"");
+  }
+  if(g==="ande")return conImporte("Pago de factura ANDE");
+  if(g==="copaco")return conImporte("Pago de factura COPACO");
+  if(g==="descuento")return conImporte("Descuento de cheques"+(banco?" — "+banco:""));
+  if(g==="cartera")return conImporte("Operación de compra de cartera"+(banco?" — "+banco:""));
   return "";
 }
 function setMPri(p,el){mtPri=p;document.querySelectorAll("#mseg-pri .seg-opt").forEach(b=>b.className="seg-opt");el.className="seg-opt "+(p==="alta"?"on-r":p==="media"?"":"on-g");}
@@ -1016,19 +1199,25 @@ function guardarTareaMob(){
   const bv=document.getElementById("mt-banco-mob").value,bp=bv.split("|");
   const genTarea=mtTipo==="general"?document.getElementById("mt-gen-tarea-mob").value:"";
   // En las tareas generales de la lista la descripción se arma sola.
-  const txt=mtTipo==="general"?textoGenTareaMob(bp[0]||""):document.getElementById("mt-txt-mob").value.trim();
-  if(!txt){toast(mtTipo==="general"&&genTarea!=="otro"?"Completá los datos de la tarea":"Ingresá una descripción","#A32D2D");return;}
-  if(mtTipo==="general"&&(genTarea==="pagare"||genTarea==="rechazado")&&!bp[0]){toast("Elegí el banco","#A32D2D");return;}
+  // La descripción se arma sola con los datos cargados, tanto en las tareas
+  // generales como en depósitos y retiros. Solo "Otros" pide escribirla a mano.
+  const txt=mtTipo==="general"?textoGenTareaMob(bp[0]||""):textoDepRetMob(bp[0]||"");
+  if(!txt){toast(mtTipo==="general"&&genTarea==="otro"?"Ingresá una descripción":"Completá los datos de la tarea","#A32D2D");return;}
+  if(mtTipo==="general"&&TAREAS_CON_BANCO.indexOf(genTarea)>=0&&!bp[0]){toast("Elegí el banco","#A32D2D");return;}
+  if(mtTipo==="general"&&genTarea==="recibo"&&!document.getElementById("mt-gen-destino-mob").value.trim()){toast("Indicá dónde se entrega el recibo","#A32D2D");return;}
   const monto=parseFloat(document.getElementById("mt-monto-mob").value)||0;
   // Depósito y retiro sin banco o sin monto no sirven: la operación no se
   // registra y la tarjeta queda sin datos. Así se guardó "Depósito sudameris".
   if(mtTipo!=="general"&&!bp[0]){toast("Elegí el banco","#A32D2D");return;}
   if(mtTipo!=="general"&&!(monto>0)){toast("Ingresá el monto","#A32D2D");return;}
   tareas.push({id:nuevoIdTarea(),txt,genTarea:genTarea,
-    genDueno:genTarea==="pagare"?document.getElementById("mt-gen-dueno-mob").value.trim():"",
-    genCant:genTarea==="rechazado"?(parseInt(document.getElementById("mt-gen-cant-mob").value,10)||0):0,
+    genDueno:genTarea==="pagare"?(valoresGenMob("dueno").filter(Boolean)[0]||""):"",
+    genDuenos:genTarea==="pagare"?valoresGenMob("dueno").filter(Boolean):[],
+    genImporte:genTarea==="rechazado"?valoresGenMob("cheque").reduce((a,v)=>a+(parseFloat(v)||0),0):(TAREAS_CON_IMPORTE.indexOf(genTarea)>=0?(parseFloat(document.getElementById("mt-gen-importe-mob").value)||0):0),
+    genDestino:genTarea==="recibo"?document.getElementById("mt-gen-destino-mob").value.trim():"",
+    genImportes:genTarea==="rechazado"?valoresGenMob("cheque").map(v=>parseFloat(v)||0).filter(v=>v>0):[],
     genSolic:genTarea==="solicitud"?(document.getElementById("mt-gen-solic-mob").value==="otro"?document.getElementById("mt-gen-solic-otro-mob").value.trim():document.getElementById("mt-gen-solic-mob").value):"",pri:mtPri,st:"pend",para:"hoy",tipo:mtTipo,mon:mtTipo!=="general"?mtMon:"",inst:mtTipo!=="general"?mtInst:"",canal:mtTipo!=="general"?mtCanal:"",monto:mtTipo!=="general"?monto:0,tc:7850,banco:bp[0]||"",numcta:bp[1]||"",nom:document.getElementById("mt-nom-mob").value,obs:(document.getElementById("mt-obs-mob").value||"").trim(),emp,fecha:today()});
-  nT++;sv();closeMobModal();renderJournal();toast("✅ Tarea agregada","var(--green)");
+  sv();closeMobModal();renderJournal();toast("✅ Tarea agregada","var(--green)");
   if(window.FDSupabase)window.FDSupabase.sendPushTrigger("🚜 Finanzas Tracto — Nueva tarea",txt+(bp[0]?" — "+bp[0]:"")+(monto?" · "+monto:""));
 }
 
@@ -1600,7 +1789,7 @@ function mergeTareasRemoto(remoto){
   // llegaron a la nube: si una tarea nunca se subió, que el otro equipo no la
   // mande no significa que la hayan borrado, solo que no la conocía.
   tareas.forEach(function(t){
-    if(t&&t.id!=null&&!vistos[t.id]&&!idsEnLaNube[t.id])out.push(t);
+    if(t&&t.id!=null&&!vistos[t.id]&&!idsEnLaNube[t.id]&&esTareaReciente(t))out.push(t);
   });
   guardarIdsEnLaNube();
   return out;
@@ -1620,10 +1809,6 @@ function mergeTareasRemoto(remoto){
 // "fd-desc" y "fd-depo" quedan afuera a propósito: la PC las vacía cuando
 // importa los cheques escaneados, y ese vaciado sí tiene que llegar.
 // ============================================================
-// Solo las tareas. Operaciones y agenda las lleva la PC: si el celular las
-// "protegía" y volvía a subir su copia, peleaba con la limpieza de duplicados de
-// la PC y las operaciones repetidas volvían una y otra vez.
-const COLECCIONES_PROTEGIDAS={"fd-tar":"tareas"};
 // Ids de tareas de las que consta que están (o estuvieron) guardadas en la
 // nube: las que vinieron en alguna lectura remota y las que este celular subió
 // con éxito. Ver mergeTareasRemoto().
@@ -1668,12 +1853,6 @@ function marcarIdsEnLaNube(lista){
   guardarIdsEnLaNube();
 }
 function nEl(v){return Array.isArray(v)?v.length:(v&&typeof v==="object"?Object.keys(v).length:0);}
-function localDeClave(key){
-  if(key==="fd-tar")return tareas;
-  if(key==="fd-ops")return ops;
-  if(key==="fd-agenda")return agenda;
-  return null;
-}
 // Ids de tareas que la PC archivó al cerrar un día. Llegan por la nube como
 // "fd-cierre": con eso el celular sabe que esas tareas salieron de la lista
 // porque se archivaron, y no porque alguien las borró.
@@ -1690,12 +1869,22 @@ function sumarCierre(v){
 // día de un borrado: con 7 tareas de ayer guardadas acá, las 3 de hoy que traía
 // la nube parecían un borrado masivo; el celular lo frenaba y SUBÍA su copia
 // vieja, pisando lo de hoy en la PC.
+// Tarea de los últimos 3 días (alcanza para las que pasaron de "mañana" a
+// "hoy" y para lo cargado un viernes sin señal que recién sube el lunes).
+// Una tarea más vieja que siga guardada en algún equipo es un resto: NUNCA se
+// rescata ni se vuelve a subir. Sin este límite, el 18/09 volvieron tres
+// tareas pendientes del 30/07 que un equipo tenía guardadas desde entonces.
+function esTareaReciente(t){
+  if(!t||!t.fecha)return false;
+  return t.fecha>=fechaLocal(new Date(Date.now()-3*86400000));
+}
 function tareasPerdidas(remoto){
   var enRemoto={};(remoto||[]).forEach(function(t){if(t&&t.id!=null)enRemoto[t.id]=1;});
   var hoyF=today();
   return tareas.filter(function(t){
     if(!t||t.id==null||enRemoto[t.id])return false;
     if(cierreIds[t.id])return false;
+    if(!esTareaReciente(t))return false;   // resto viejo: no se rescata
     if(t.st==="done"&&t.doneAt&&fechaLocal(new Date(t.doneAt))<hoyF)return false;
     return true;
   });
@@ -1745,7 +1934,7 @@ function applyRemoteChangeMob(key,value){
   if(key==="fd-tar"){
     const idsAntes=new Set(tareas.map(t=>t.id));
     const nuevas=value.filter(t=>!idsAntes.has(t.id));
-    tareas=mergeTareasRemoto(value);nT=tareas.length?Math.max(0,...tareas.map(t=>t.id))+1:1;renderJournal();
+    tareas=mergeTareasRemoto(value);renderJournal();
     nuevas.forEach(t=>notificarNuevaTarea(t));
   }
   else if(key==="fd-ops"){ops=value;nO=ops.length?Math.max(0,...ops.map(o=>o.id))+1:1;}
@@ -1824,7 +2013,6 @@ async function ftResyncMob(){
   if(remote["fd-depo"]!=null){depositos=remote["fd-depo"];hubo=true;}
   if(remote["fd-notas"]!=null&&remote["fd-notas"]!==""){notasJ=remote["fd-notas"];hubo=true;}
   if(remote["fd-oficina"]!=null){oficina=Object.assign({activo:false,lugar:"",inicio:null,hist:[]},remote["fd-oficina"]);oficinaAnchor=null;hubo=true;}
-  nT=tareas.length?Math.max(0,...tareas.map(t=>t.id))+1:1;
   nO=ops.length?Math.max(0,...ops.map(o=>o.id))+1:1;
   nA=agenda.length?Math.max(0,...agenda.map(a=>a.id))+1:1;
   nD=descuentos.length?Math.max(0,...descuentos.map(d=>d.id))+1:1;
@@ -1901,8 +2089,19 @@ async function fdInitMobileSupabase(){
 }
 // Resincronizar y "despertar" el cronómetro apenas la pantalla vuelve a
 // estar activa (antes se quedaba pegado en el último valor visto).
-document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible"){cronoAnchors={};ftResyncMob();}});
-window.addEventListener("focus",function(){cronoAnchors={};ftResyncMob();});
+// Al volver a la app llegan juntos "visibilitychange" y "focus". Antes cada uno
+// hacía su propia lectura completa de la nube, y sin esperar a que terminara de
+// subir un cambio propio: la lectura podía pisar en pantalla lo recién hecho.
+let ultimoVolverAlFrente=0;
+function alVolverAlFrente(){
+  cronoAnchors={};
+  const ahora=Date.now();
+  if(ahora-ultimoVolverAlFrente<2000)return;
+  ultimoVolverAlFrente=ahora;
+  ftResyncSeguro();
+}
+document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")alVolverAlFrente();});
+window.addEventListener("focus",alVolverAlFrente);
 // PWA Service Worker — se registra ANTES de fdInitMobileSupabase() porque
 // subscribePush() espera navigator.serviceWorker.ready, y esa promesa no se
 // resuelve hasta que haya un Service Worker registrado y activo. Este era

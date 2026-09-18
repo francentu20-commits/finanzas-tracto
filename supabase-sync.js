@@ -422,9 +422,7 @@
   }
 
   window.FDSupabase = {
-    client,
     loadAll,
-    saveKey,
     pushAll,
     hasPendingPush,
     estaListoParaEscribir,
