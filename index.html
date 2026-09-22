@@ -135,7 +135,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
     <svg width="26" height="26" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#F5C200"/><circle cx="145" cy="330" r="90" fill="#1a1a1a"/><circle cx="145" cy="330" r="50" fill="#eee"/><circle cx="145" cy="330" r="22" fill="#1a1a1a"/><circle cx="355" cy="345" r="55" fill="#1a1a1a"/><circle cx="355" cy="345" r="28" fill="#eee"/><rect x="110" y="180" width="290" height="120" rx="18" fill="#1a1a1a"/><rect x="270" y="110" width="130" height="100" rx="18" fill="#1a1a1a"/><rect x="278" y="118" width="114" height="76" rx="10" fill="#a8d8f0" opacity=".85"/></svg>
     Finanzas Tracto
     <!-- Versión visible. Tiene que coincidir en la PC, en el celular y en el CACHE de sw.js del celular: si alguno dice otro número, ese equipo no tiene la última versión. Se sube junto con cada cambio. -->
-    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v42</span>
+    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v45</span>
   </div>
   <button class="emp-switch" onclick="toggleEmp()" id="emp-btn">Tracto</button>
 </div>
@@ -1304,7 +1304,7 @@ function mobProcImg(file){
       // Las fotos de cámara suelen pesar varios MB, muy por encima del límite
       // de OCR.space y más pesadas de lo que necesita el OCR para leer bien.
       // Se reescala a un ancho máximo razonable antes de mandarla.
-      const maxW=1800;
+      const maxW=1600;
       const scale=img.width>maxW?maxW/img.width:1;
       const w=Math.round(img.width*scale),h=Math.round(img.height*scale);
       const cv=document.createElement("canvas");cv.width=w;cv.height=h;
@@ -1373,6 +1373,20 @@ function toggleOcrDebug(){
 // token corto seguido de una tanda de 6-9 dígitos sin barra) y, a medida que
 // se va encontrando cada uno, se lo saca del texto de trabajo para que sus
 // dígitos no se confundan con los del siguiente dato que se busca.
+// Nombre del cliente escrito como corresponde: el OCR lo devuelve tal cual
+// está impreso en el cheque (casi siempre todo en mayúsculas).
+// "MARIO BENITEZ" -> "Mario Benitez", "MARIA DE LOS ANGELES" -> "Maria de los
+// Angeles"; las siglas de sociedad quedan en mayúscula ("S.A.", "S.R.L.").
+var PARTICULAS_NOMBRE=/^(de|del|la|las|los|y|e|da|do|dos|van|von)$/;
+var SIGLAS_NOMBRE=/^(s\.?a\.?(e\.?)?(c\.?a\.?)?|s\.?r\.?l\.?|e\.?i\.?r\.?l\.?)$/;
+function nombrePropio(s){
+  s=String(s||"").replace(/\s+/g," ").trim();
+  return s.toLowerCase().split(" ").map(function(p,i){
+    if(SIGLAS_NOMBRE.test(p))return p.toUpperCase();
+    if(i>0&&PARTICULAS_NOMBRE.test(p))return p;
+    return p.replace(/(^|[-'.])([a-z\u00e0-\u00fe])/g,function(m,a,b){return a+b.toUpperCase();});
+  }).join(" ");
+}
 function parseChequeOCR(ocrRawText){
   const p={};
   const tx=ocrRawText.replace(/\n/g," ");
@@ -1436,7 +1450,7 @@ function parseChequeOCR(ocrRawText){
     if(idx>0){
       for(let i=idx-1;i>=0&&i>=idx-4;i--){
         const l=lineas[i];
-        if(l.length>=5&&l.length<=45&&!/\d/.test(l)&&!badWords.test(l)&&/[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(l)){p.cliente=l;break;}
+        if(l.length>=5&&l.length<=45&&!/\d/.test(l)&&!badWords.test(l)&&/[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(l)){p.cliente=nombrePropio(l);break;}
       }
     }
   }
@@ -1564,17 +1578,31 @@ function fillDescuentoForm(){
   document.getElementById("desc-serie-zoom-btn").style.display=(!ocrParsed.serie&&scanImgOrig)?"block":"none";
 }
 
-async function ocrSpaceRequest(base64Jpeg){
-  const fd=new FormData();
-  fd.append("base64Image","data:image/jpeg;base64,"+base64Jpeg);
-  fd.append("language","spa");
-  fd.append("isOverlayRequired","false");
-  fd.append("apikey","K82919407788957");
-  fd.append("OCREngine","2");
-  fd.append("scale","true");
-  fd.append("detectOrientation","true");
-  const res=await fetch("https://api.ocr.space/parse/image",{method:"POST",body:fd});
-  const data=await res.json();
+// OCR.space gratis normalmente responde en 2 a 5 segundos, pero a veces se
+// queda trabado y la pantalla quedaba esperando mucho. Si en 15 segundos no
+// respondió, se corta y se reintenta una vez con el otro motor de OCR.space.
+async function pedirOCRSpace(base64Jpeg,alReintentar){
+  async function intento(motor,espera){
+    var fd=new FormData();
+    fd.append("apikey","K82919407788957");
+    fd.append("base64Image","data:image/jpeg;base64,"+base64Jpeg);
+    fd.append("language","spa");
+    fd.append("isOverlayRequired","false");
+    fd.append("OCREngine",motor);
+    fd.append("scale","true");
+    fd.append("detectOrientation","true");
+    var ctrl=new AbortController(),t=setTimeout(function(){ctrl.abort();},espera);
+    try{var resp=await fetch("https://api.ocr.space/parse/image",{method:"POST",body:fd,signal:ctrl.signal});return await resp.json();}
+    finally{clearTimeout(t);}
+  }
+  try{return await intento("2",15000);}
+  catch(e){if(!e||e.name!=="AbortError")throw e;}
+  if(alReintentar)alReintentar();
+  try{return await intento("1",25000);}
+  catch(e){if(e&&e.name==="AbortError")throw new Error("el servicio de OCR no responde, probá de nuevo en un rato");throw e;}
+}
+async function ocrSpaceRequest(base64Jpeg,alReintentar){
+  const data=await pedirOCRSpace(base64Jpeg,alReintentar);
   if(data.IsErroredOnProcessing)throw new Error(Array.isArray(data.ErrorMessage)?data.ErrorMessage.join(" "):(data.ErrorMessage||"Error de OCR"));
   return (data.ParsedResults&&data.ParsedResults[0])?data.ParsedResults[0].ParsedText:"";
 }
@@ -1584,7 +1612,7 @@ async function mobEscanear(){
   document.getElementById("mob-scan-resultado").style.display="block";
   document.getElementById("mob-ocr-fields").innerHTML='<div style="text-align:center;padding:16px;color:var(--tx2)"><span class="spin"></span> Procesando...</div>';
   try{
-    ocrRaw=await ocrSpaceRequest(scanB64);
+    ocrRaw=await ocrSpaceRequest(scanB64,()=>{document.getElementById("mob-ocr-fields").innerHTML='<div style="text-align:center;padding:16px;color:var(--tx2)"><span class="spin"></span> El servicio de OCR está lento, reintentando...</div>';});
     document.getElementById("mob-spin").style.display="none";
     if(!ocrRaw.trim()){document.getElementById("mob-ocr-fields").innerHTML='<div style="color:var(--tx2)">No se pudo leer el texto. Intentá con mejor iluminación.</div>';return;}
     ocrParsed=parseChequeOCR(ocrRaw);
