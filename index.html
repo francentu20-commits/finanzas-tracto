@@ -135,7 +135,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
     <svg width="26" height="26" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#F5C200"/><circle cx="145" cy="330" r="90" fill="#1a1a1a"/><circle cx="145" cy="330" r="50" fill="#eee"/><circle cx="145" cy="330" r="22" fill="#1a1a1a"/><circle cx="355" cy="345" r="55" fill="#1a1a1a"/><circle cx="355" cy="345" r="28" fill="#eee"/><rect x="110" y="180" width="290" height="120" rx="18" fill="#1a1a1a"/><rect x="270" y="110" width="130" height="100" rx="18" fill="#1a1a1a"/><rect x="278" y="118" width="114" height="76" rx="10" fill="#a8d8f0" opacity=".85"/></svg>
     Finanzas Tracto
     <!-- Versión visible. Tiene que coincidir en la PC, en el celular y en el CACHE de sw.js del celular: si alguno dice otro número, ese equipo no tiene la última versión. Se sube junto con cada cambio. -->
-    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v45</span>
+    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v47</span>
   </div>
   <button class="emp-switch" onclick="toggleEmp()" id="emp-btn">Tracto</button>
 </div>
@@ -1373,6 +1373,69 @@ function toggleOcrDebug(){
 // token corto seguido de una tanda de 6-9 dígitos sin barra) y, a medida que
 // se va encontrando cada uno, se lo saca del texto de trabajo para que sus
 // dígitos no se confundan con los del siguiente dato que se busca.
+// Fechas del cheque: emisión y vencimiento.
+// El OCR devuelve la fecha tal cual está impresa, y en los cheques aparece de
+// muchas formas: "15/10/2026", "15-10-26", en casilleros separados
+// ("15 10 2026") o todo junto ("15102026"). Antes solo se entendían las que
+// tenían barras o guiones, por eso muchas veces la fecha quedaba vacía.
+// Se descarta todo lo que no puede ser una fecha (día mayor a 31, mes mayor a
+// 12, año fuera de 2015-2045), así un número de cheque o de cuenta no se
+// confunde con una fecha.
+// Si el cheque trae UNA sola fecha, va a VENCIMIENTO (es la fecha de pago);
+// si trae dos, la más antigua es la emisión y la otra el vencimiento.
+function fechaISO(d,m,y){
+  if(y<100)y+=2000;
+  if(!(d>=1&&d<=31)||!(m>=1&&m<=12)||!(y>=2015&&y<=2045))return "";
+  return y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0");
+}
+function fechaDeDigitos(trozo){
+  // Se juntan los dígitos del pedazo de texto y se parten por largo:
+  // "15 09 2026" -> 15/09/2026, "150926" -> 15/09/2026. Si vienen más
+  // dígitos de la cuenta (porque el casillero arrastró el número de al
+  // lado) se prueba con los primeros 8, después 7 y después 6.
+  var d=String(trozo||"").replace(/\D/g,""),f="";
+  if(d.length>=8)f=fechaISO(+d.slice(0,2),+d.slice(2,4),+d.slice(4,8));
+  if(!f&&d.length>=7)f=fechaISO(+d.slice(0,1),+d.slice(1,3),+d.slice(3,7));
+  if(!f&&d.length>=6)f=fechaISO(+d.slice(0,2),+d.slice(2,4),+d.slice(4,6));
+  return f;
+}
+function fechasDelCheque(texto){
+  var t=String(texto||"").replace(/\s+/g," ");
+  var sinT=t.normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  var res={emision:"",venc:""};
+  // 1) Las que vienen pegadas a su etiqueta impresa en el cheque
+  var mV=sinT.match(/(?:fecha\s*de\s*)?(?:pago|vencimiento|vence|vto)\.?\s*:?\s*([\d\s\/\-.]{6,22})/i);
+  if(mV)res.venc=fechaDeDigitos(mV[1]);
+  var mE=sinT.match(/fecha\s*de\s*emision\s*:?\s*([\d\s\/\-.]{6,22})/i);
+  if(mE)res.emision=fechaDeDigitos(mE[1]);
+  // 2) Todas las demás fechas que aparezcan sueltas en el texto
+  var cand=[],m1,m2;
+  var re1=/\b(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{2,4})\b/g;
+  while((m1=re1.exec(sinT))){var f1=fechaISO(+m1[1],+m1[2],+m1[3]);if(f1)cand.push(f1);}
+  var re2=/(?:^|[^\d\/\-.])((?:\d ?){6,8})(?![\d\/\-.])/g;
+  while((m2=re2.exec(sinT))){
+    // Un importe escrito sin puntos (ej. "Gs 10122026") tiene la misma pinta
+    // que una fecha, así que no se toma lo que viene detrás de Gs / $.
+    if(/(gs|guaranies|\$|us\$)\.?\s*$/i.test(sinT.slice(Math.max(0,m2.index-12),m2.index+1)))continue;
+    var f2=fechaDeDigitos(m2[1]);if(f2)cand.push(f2);
+  }
+  var vistos={},sueltas=[];
+  if(res.emision)vistos[res.emision]=1;
+  if(res.venc)vistos[res.venc]=1;
+  for(var i=0;i<cand.length;i++){if(!vistos[cand[i]]){vistos[cand[i]]=1;sueltas.push(cand[i]);}}
+  sueltas.sort();
+  if(!res.venc){
+    var posibles=sueltas.filter(function(f){return !res.emision||f>res.emision;});
+    if(!res.emision&&posibles.length>1)res.emision=posibles.shift();
+    if(posibles.length)res.venc=posibles[posibles.length-1];
+  }else if(!res.emision){
+    var previas=sueltas.filter(function(f){return f<res.venc;});
+    if(previas.length)res.emision=previas[0];
+  }
+  return res;
+}
+// En el celular las fechas se muestran como DD/MM/AAAA.
+function aDDMMAAAA(iso){var p=String(iso||"").split("-");return p.length===3?p[2]+"/"+p[1]+"/"+p[0]:"";}
 // Nombre del cliente escrito como corresponde: el OCR lo devuelve tal cual
 // está impreso en el cheque (casi siempre todo en mayúsculas).
 // "MARIO BENITEZ" -> "Mario Benitez", "MARIA DE LOS ANGELES" -> "Maria de los
@@ -1425,16 +1488,10 @@ function parseChequeOCR(ocrRawText){
   if(/\bVISTA\b/i.test(tx))p.tipo="VISTA";
   else if(/\bDIFERIDO\b/i.test(tx))p.tipo="DIFERIDO";
 
-  // Fecha de emisión y de vencimiento (cheque diferido).
-  // Un cheque diferido trae DOS fechas impresas: la de emisión (el día que
-  // se llenó el cheque, puede ser cualquier día pasado) y la de vencimiento
-  // (el día de pago). Antes solo se buscaba una y "Vencimiento" quedaba
-  // siempre vacío. Ahora se buscan las dos, en el orden en que aparecen en
-  // el texto: la primera va a Emisión, la segunda a Vencimiento.
-  const fechasEncontradas=[...tx.matchAll(/\b(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{2,4})\b/g)]
-    .map(fm=>{const y=fm[3].length===2?"20"+fm[3]:fm[3];return fm[1].padStart(2,"0")+"/"+fm[2].padStart(2,"0")+"/"+y;});
-  if(fechasEncontradas[0])p.fecha=fechasEncontradas[0];
-  if(fechasEncontradas[1])p.fechaVenc=fechasEncontradas[1];
+  // Fecha de emisión y de vencimiento (ver fechasDelCheque).
+  const fechasCh=fechasDelCheque(ocrRawText);
+  if(fechasCh.emision)p.fecha=aDDMMAAAA(fechasCh.emision);
+  if(fechasCh.venc)p.fechaVenc=aDDMMAAAA(fechasCh.venc);
 
   // Documento (CI/RUC) del firmante, impreso junto al QR — se saca primero
   // del texto de trabajo para que sus dígitos no se confundan con la cuenta
@@ -1547,7 +1604,7 @@ function renderOcrSummary(){
       ["Vencimiento",ocrParsed.fechaVenc]
     ];
   }else{
-    campos=[["N° cheque",ocrParsed.nch],["Banco emisor",ocrParsed.banco],["Importe",ocrParsed.monto?("Gs. "+fN(importeANumero(ocrParsed.monto))):null],["Fecha",ocrParsed.fecha]];
+    campos=[["N° cheque",ocrParsed.nch],["Banco emisor",ocrParsed.banco],["Importe",ocrParsed.monto?("Gs. "+fN(importeANumero(ocrParsed.monto))):null],["Fecha",ocrParsed.fecha||ocrParsed.fechaVenc]];
   }
   const detectados=campos.filter(c=>c[1]);
   document.getElementById("mob-ocr-fields").innerHTML=detectados.length
@@ -1721,7 +1778,7 @@ function mobGuardarDescuento(){
     documento:document.getElementById("desc-documento").value.trim(),
     importe:document.getElementById("desc-importe").value.trim(),
     venc:document.getElementById("desc-venc").value||"",
-    cliente:document.getElementById("desc-cliente").value.trim(),
+    cliente:nombrePropio(document.getElementById("desc-cliente").value),
     tipoDoc:document.getElementById("desc-tipodoc").value.trim(),
     emision:document.getElementById("desc-emision").value||""
   };
