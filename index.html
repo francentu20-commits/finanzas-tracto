@@ -135,7 +135,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
     <svg width="26" height="26" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#F5C200"/><circle cx="145" cy="330" r="90" fill="#1a1a1a"/><circle cx="145" cy="330" r="50" fill="#eee"/><circle cx="145" cy="330" r="22" fill="#1a1a1a"/><circle cx="355" cy="345" r="55" fill="#1a1a1a"/><circle cx="355" cy="345" r="28" fill="#eee"/><rect x="110" y="180" width="290" height="120" rx="18" fill="#1a1a1a"/><rect x="270" y="110" width="130" height="100" rx="18" fill="#1a1a1a"/><rect x="278" y="118" width="114" height="76" rx="10" fill="#a8d8f0" opacity=".85"/></svg>
     Finanzas Tracto
     <!-- Versión visible. Tiene que coincidir en la PC, en el celular y en el CACHE de sw.js del celular: si alguno dice otro número, ese equipo no tiene la última versión. Se sube junto con cada cambio. -->
-    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v47</span>
+    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v48</span>
   </div>
   <button class="emp-switch" onclick="toggleEmp()" id="emp-btn">Tracto</button>
 </div>
@@ -256,11 +256,8 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
     <!-- Descuento -->
     <div class="card" id="scan-descuento-save" style="display:none">
       <div class="card-title">Guardar descuento</div>
-      <div class="fgrp"><span class="flabel">Banco (código)</span><input class="fi" id="desc-banco" placeholder="Ej: 17" inputmode="numeric"></div>
-      <div style="display:flex;gap:8px">
-        <div class="fgrp" style="flex:1"><span class="flabel">Tipo</span><select class="fi" id="desc-tipo"><option value="DIFERIDO">Diferido</option><option value="VISTA">Vista</option></select></div>
-        <div class="fgrp" style="flex:1"><span class="flabel">Moneda</span><select class="fi" id="desc-moneda"><option value="PYG">PYG</option><option value="USD">USD</option></select></div>
-      </div>
+      <div class="fgrp"><span class="flabel">Banco</span><input class="fi" id="desc-banco" placeholder="Ej: Atlas"></div>
+      <div class="fgrp"><span class="flabel">Moneda</span><select class="fi" id="desc-moneda"><option value="PYG">PYG</option><option value="USD">USD</option></select></div>
       <div style="display:flex;gap:8px">
         <div class="fgrp" style="flex:1"><span class="flabel">N° cheque</span><input class="fi" id="desc-nrochq"></div>
         <div class="fgrp" style="flex:1">
@@ -550,6 +547,7 @@ function parseT(txt){
 // si tiene 3 dígitos atrás es separador de miles (acá no se usan milésimos, y
 // el OCR a veces escribe "1156.000" queriendo decir "1.156.000"); si tiene 1 o
 // 2, es decimal. Varios separadores iguales solo pueden ser de miles.
+function simboloMoneda(m){return m==="USD"?"US$ ":"Gs. ";}
 function importeANumero(v){
   if(typeof v==="number")return isFinite(v)?v:0;
   if(v===null||v===undefined)return 0;
@@ -1335,8 +1333,7 @@ function mobResetScan(){
   document.getElementById("mob-ocr-fields").innerHTML="";
   const rawBox=document.getElementById("mob-ocr-raw");if(rawBox){rawBox.style.display="none";rawBox.textContent="";}
   ["desc-banco","desc-nrochq","desc-serie","desc-ctacte","desc-documento","desc-tipodoc","desc-cliente","desc-importe","desc-emision","desc-venc","dep-nch","dep-banco","dep-importe"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
-  const db=document.getElementById("desc-banco");if(db)db.placeholder="Ej: 17";
-  const dt=document.getElementById("desc-tipo");if(dt)dt.value="DIFERIDO";
+  const db=document.getElementById("desc-banco");if(db)db.placeholder="Ej: Atlas";
   const dm=document.getElementById("desc-moneda");if(dm)dm.value="PYG";
   const depm=document.getElementById("dep-moneda");if(depm)depm.value="GS";
   const sb=document.getElementById("desc-serie-zoom-btn");if(sb)sb.style.display="none";
@@ -1373,6 +1370,35 @@ function toggleOcrDebug(){
 // token corto seguido de una tanda de 6-9 dígitos sin barra) y, a medida que
 // se va encontrando cada uno, se lo saca del texto de trabajo para que sus
 // dígitos no se confundan con los del siguiente dato que se busca.
+// Importe y moneda del cheque.
+// Los cheques en dólares tienen importes mucho más chicos que los de
+// guaraníes ("US$ 850,00"), y antes se descartaba cualquier número menor a
+// 1.000: por eso los importes en dólares salían vacíos o agarraba otro
+// número del cheque. Ahora primero se mira la moneda y después se busca el
+// importe con el mínimo que corresponde a esa moneda.
+function monedaDelCheque(texto){
+  var t=String(texto||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  return /US\s*\$|U\$S|\bUSD\b|dolar/i.test(t)?"USD":"GS";
+}
+function montoDelCheque(texto,moneda,textoSinDatos){
+  var t=String(texto||""),min=moneda==="USD"?10:1000,max=moneda==="USD"?9999999:9999999999;
+  // Lo más confiable es el número que viene justo detrás del signo de la
+  // moneda, que es como está impreso el importe en el casillero del cheque.
+  var anc=t.match(/(?:US\s*\$|U\$S|USD|₲|Gs\.?|\$)\s*(\d[\d.,]{2,14})/i);
+  if(anc){var v=importeANumero(anc[1]);if(v>=min&&v<=max)return v;}
+  // Si no, se elige entre todos los números del cheque: primero los que
+  // tienen separadores (tienen pinta de importe), en dólares los que además
+  // terminan en centavos, y a igualdad el de parte entera más larga.
+  var cands=String(textoSinDatos||t).match(/\d[\d.,]{1,14}\d|\d{4,9}/g)||[];
+  var mejor=null,mejorScore=-1;
+  for(var i=0;i<cands.length;i++){
+    var val=importeANumero(cands[i]);
+    if(!val||val<min||val>max)continue;
+    var score=(/[.,]/.test(cands[i])?1000:0)+((moneda==="USD"&&/[.,]\d{2}$/.test(cands[i]))?500:0)+String(Math.trunc(val)).length;
+    if(score>mejorScore){mejorScore=score;mejor=val;}
+  }
+  return mejor;
+}
 // Fechas del cheque: emisión y vencimiento.
 // El OCR devuelve la fecha tal cual está impresa, y en los cheques aparece de
 // muchas formas: "15/10/2026", "15-10-26", en casilleros separados
@@ -1462,31 +1488,21 @@ function parseChequeOCR(ocrRawText){
   // y nombre de cliente.
   let work=tx.normalize("NFD").replace(/[̀-ͯ]/g,"");
 
-  // Banco emisor (nombre impreso en el cheque) + su código numérico oficial
-  // (el mismo que se usa en el PDF de exportación), para autocompletar
-  // directamente el campo "Banco (código)" sin tener que tipearlo a mano.
-  const BANCOS_PY=[
-    ["Central del Paraguay",1],["Nacional de Fomento",2],["Nacion Argentina",3],
-    ["GNB",4],["Do Brasil",5],["Citibank",6],["Sudameris",8],["Continental",20],
-    ["Basa",30],["Visión",39],["Río",40],["Familiar",41],["Atlas",42],
-    ["Bancop",43],["Interfisa",44],["Solar",45],["Ueno",46],["Zeta",47],
-    // De la lista anterior, sin código numérico confirmado todavía:
-    ["Regional",null],["FIC",null]
-  ];
+  // Banco emisor: el nombre impreso en el cheque, que es lo que va a la
+  // planilla. El código numérico ya no se usa.
+  const BANCOS_PY=["Central del Paraguay","Nacional de Fomento","Nacion Argentina",
+    "GNB","Do Brasil","Citibank","Sudameris","Continental","Basa","Visión","Río",
+    "Familiar","Atlas","Bancop","Interfisa","Solar","Ueno","Zeta","Regional","FIC"];
   const workUp=work.toUpperCase();
-  for(const [nom,cod] of BANCOS_PY.slice().sort((a,b)=>b[0].length-a[0].length)){
+  for(const nom of BANCOS_PY.slice().sort((a,b)=>b.length-a.length)){
     const nomNorm=nom.normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase();
-    if(workUp.includes(nomNorm)){p.banco=nom;p.bancoCod=cod;break;}
+    if(workUp.includes(nomNorm)){p.banco=nom;break;}
   }
 
   // Empresa destino (solo Depósito) — se deduce de a nombre de quién está el
   // cheque ("Páguese a la orden de..."), no de ningún selector manual.
   if(/agricultural\s*business|agrisa/i.test(work))p.empDetectada="agri";
   else if(/tracto\s*agro\s*vial|\btracto\b/i.test(work))p.empDetectada="tracto";
-
-  // Tipo: "CHEQUE VISTA" vs "CHEQUE DIFERIDO", impreso en el cheque
-  if(/\bVISTA\b/i.test(tx))p.tipo="VISTA";
-  else if(/\bDIFERIDO\b/i.test(tx))p.tipo="DIFERIDO";
 
   // Fecha de emisión y de vencimiento (ver fechasDelCheque).
   const fechasCh=fechasDelCheque(ocrRawText);
@@ -1534,7 +1550,7 @@ function parseChequeOCR(ocrRawText){
   // ningún banco por nombre pero SÍ apareció el formato de cuenta exclusivo
   // de Itaú (arriba), se infiere el banco por ahí — se marca como
   // "inferido" para que quede claro que conviene confirmarlo a mano.
-  if(!p.banco&&esFormatoCuentaItau){p.banco="Itaú (inferido por formato de cuenta)";p.bancoCod=17;}
+  if(!p.banco&&esFormatoCuentaItau)p.banco="Itaú (inferido por formato de cuenta)";
 
   // N° de cheque, y serie por separado: probamos primero si vienen pegados
   // (serie + espacio + número).
@@ -1560,31 +1576,12 @@ function parseChequeOCR(ocrRawText){
     }
   }
 
-  // Importe: el símbolo de guaraní (Ø/₲) suele salir mal leído del OCR, y a
-  // veces se come algún punto de miles (ej: "1156.000" en vez de
-  // "1.156.000"), así que en vez de exigir un formato prolijo de a 3 dígitos
-  // se toma, de lo que queda en el texto de trabajo (ya sin cuenta/documento/
-  // cheque), el número más largo/con separadores — el que mejor pinta de
-  // importe tiene — siempre que el valor final tenga sentido para un cheque.
-  const montoCands=work.match(/\d[\d.,]{1,14}\d|\d{4,9}/g)||[];
-  let mejorMonto=null,mejorScore=-1;
-  for(const cand of montoCands){
-    // OJO con los decimales. Acá antes se borraban de un saque TODOS los
-    // puntos y comas, y eso trataba el ",00" del final como si fueran dos
-    // dígitos más de miles: "9.120.535,00" entraba como 912.053.500, cien
-    // veces más grande. Encima ese candidato inflado sumaba dos dígitos al
-    // puntaje, así que le ganaba al correcto y era el que quedaba.
-    // importeANumero() ya distingue el separador de miles del decimal
-    // (3 dígitos atrás = miles, 1 o 2 = decimal), que es justo lo que hace
-    // falta para leer bien los ",00".
-    const val=importeANumero(cand);
-    if(!val||val<1000||val>9999999999)continue;
-    // El puntaje mira los dígitos de la parte entera: los centavos no tienen
-    // que hacer que un importe parezca más grande de lo que es.
-    const score=(/[.,]/.test(cand)?1000:0)+String(Math.trunc(val)).length;
-    if(score>mejorScore){mejorScore=score;mejorMonto=val;}
-  }
-  if(mejorMonto)p.monto=String(mejorMonto);
+  // Importe y moneda (ver montoDelCheque). Para la segunda pasada se usa
+  // "work", que es el texto sin la cuenta, el documento ni el N° de cheque.
+  p.moneda=monedaDelCheque(tx);
+  const montoCh=montoDelCheque(tx,p.moneda,work);
+  if(montoCh)p.monto=String(montoCh);
+
 
   return p;
 }
@@ -1593,18 +1590,18 @@ function renderOcrSummary(){
   let campos;
   if(scanMode==="descuento"){
     campos=[
-      ["Banco (texto)",ocrParsed.banco?(ocrParsed.banco+(ocrParsed.bancoCod!=null?" — cód. "+ocrParsed.bancoCod:"")):null],
+      ["Banco",ocrParsed.banco],
       ["Cuenta cte.",ocrParsed.ctaCte],
       ["Serie",ocrParsed.serie],
       ["N° cheque",ocrParsed.nch],
       ["Documento",(ocrParsed.tipoDoc&&ocrParsed.documento)?(ocrParsed.tipoDoc+" "+ocrParsed.documento):null],
       ["Cliente",ocrParsed.cliente],
-      ["Importe",ocrParsed.monto?("Gs. "+fN(importeANumero(ocrParsed.monto))):null],
+      ["Importe",ocrParsed.monto?(simboloMoneda(ocrParsed.moneda)+fN(importeANumero(ocrParsed.monto))):null],
       ["Emisión",ocrParsed.fecha],
       ["Vencimiento",ocrParsed.fechaVenc]
     ];
   }else{
-    campos=[["N° cheque",ocrParsed.nch],["Banco emisor",ocrParsed.banco],["Importe",ocrParsed.monto?("Gs. "+fN(importeANumero(ocrParsed.monto))):null],["Fecha",ocrParsed.fecha||ocrParsed.fechaVenc]];
+    campos=[["N° cheque",ocrParsed.nch],["Banco emisor",ocrParsed.banco],["Importe",ocrParsed.monto?(simboloMoneda(ocrParsed.moneda)+fN(importeANumero(ocrParsed.monto))):null],["Fecha",ocrParsed.fecha||ocrParsed.fechaVenc]];
   }
   const detectados=campos.filter(c=>c[1]);
   document.getElementById("mob-ocr-fields").innerHTML=detectados.length
@@ -1617,12 +1614,11 @@ function fillDepositoForm(){
   document.getElementById("dep-nch").value=ocrParsed.nch||"";
   document.getElementById("dep-banco").value=ocrParsed.banco||"";
   document.getElementById("dep-importe").value=ocrParsed.monto||"";
-  document.getElementById("dep-moneda").value="GS";
+  document.getElementById("dep-moneda").value=ocrParsed.moneda==="USD"?"USD":"GS";
 }
 function fillDescuentoForm(){
-  document.getElementById("desc-banco").value=(ocrParsed.bancoCod!=null)?String(ocrParsed.bancoCod):"";
-  document.getElementById("desc-banco").placeholder=ocrParsed.banco?("Detectado: "+ocrParsed.banco+(ocrParsed.bancoCod==null?" (código no cargado, completar a mano)":"")):"Ej: 17";
-  document.getElementById("desc-tipo").value=ocrParsed.tipo||"DIFERIDO";
+  document.getElementById("desc-banco").value=ocrParsed.banco||"";
+  document.getElementById("desc-moneda").value=ocrParsed.moneda==="USD"?"USD":"PYG";
   document.getElementById("desc-nrochq").value=ocrParsed.nch||"";
   document.getElementById("desc-serie").value=ocrParsed.serie||"";
   document.getElementById("desc-ctacte").value=ocrParsed.ctaCte||"";
@@ -1770,7 +1766,6 @@ function mobGuardarDescuento(){
   const rec={
     id:nD++,
     banco:document.getElementById("desc-banco").value.trim(),
-    tipo:document.getElementById("desc-tipo").value,
     moneda:document.getElementById("desc-moneda").value,
     nch:document.getElementById("desc-nrochq").value.trim(),
     serie:document.getElementById("desc-serie").value.trim(),
@@ -1801,7 +1796,7 @@ function renderDescuentosList(){
   cont.innerHTML=descuentos.slice().reverse().map(d=>`
     <div class="ocr-field" style="align-items:flex-start">
       <span class="ocr-field-lbl">${d.cliente||"(sin cliente)"}<br><span style="font-weight:400;color:var(--tx2)">Cheque ${d.nch||"-"} · ${d.banco||"-"}</span></span>
-      <span class="ocr-field-val">Gs. ${fN(importeANumero(d.importe))}<br><span style="font-weight:400;color:#A32D2D;cursor:pointer" onclick="mobBorrarDescuento(${d.id})">Eliminar</span></span>
+      <span class="ocr-field-val">${simboloMoneda(d.moneda)}${fN(importeANumero(d.importe))}<br><span style="font-weight:400;color:#A32D2D;cursor:pointer" onclick="mobBorrarDescuento(${d.id})">Eliminar</span></span>
     </div>`).join("");
 }
 
