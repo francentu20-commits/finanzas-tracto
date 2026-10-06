@@ -12,6 +12,8 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="supabase-sync.js"></script>
 <style>
 :root{
@@ -135,7 +137,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
     <svg width="26" height="26" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#F5C200"/><circle cx="145" cy="330" r="90" fill="#1a1a1a"/><circle cx="145" cy="330" r="50" fill="#eee"/><circle cx="145" cy="330" r="22" fill="#1a1a1a"/><circle cx="355" cy="345" r="55" fill="#1a1a1a"/><circle cx="355" cy="345" r="28" fill="#eee"/><rect x="110" y="180" width="290" height="120" rx="18" fill="#1a1a1a"/><rect x="270" y="110" width="130" height="100" rx="18" fill="#1a1a1a"/><rect x="278" y="118" width="114" height="76" rx="10" fill="#a8d8f0" opacity=".85"/></svg>
     Finanzas Tracto
     <!-- Versión visible. Tiene que coincidir en la PC, en el celular y en el CACHE de sw.js del celular: si alguno dice otro número, ese equipo no tiene la última versión. Se sube junto con cada cambio. -->
-    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v48</span>
+    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v53</span>
   </div>
   <button class="emp-switch" onclick="toggleEmp()" id="emp-btn">Tracto</button>
 </div>
@@ -144,6 +146,10 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
 
 <!-- JOURNAL -->
 <div id="page-jour" class="page active">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+    <span id="mob-perfil-punto" style="width:22px;height:22px;border-radius:50%;background:var(--bd);flex:none"></span>
+    <select class="fi" id="mob-perfil-sel" style="flex:1;padding:6px 8px;font-size:13px" onchange="elegirPerfilMob()"></select>
+  </div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
     <div>
       <div style="font-size:16px;font-weight:800" id="j-fecha-mob"></div>
@@ -152,6 +158,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
     <div style="font-size:12px;color:var(--blue);font-weight:700" id="j-pct-mob">0%</div>
   </div>
   <div class="pbar"><div class="pfill" id="j-bar-mob" style="width:0%"></div></div>
+  <div id="mob-sugerencia" style="display:none;margin-top:10px;background:var(--gl);border-left:3px solid var(--green);border-radius:8px;padding:8px 10px;font-size:12px"></div>
   <div class="metrics">
     <div class="metric"><div class="ml">Completadas</div><div class="mv" style="color:var(--green)" id="jm-don">0</div></div>
     <div class="metric"><div class="ml">No cumplidas</div><div class="mv" style="color:var(--amber)" id="jm-nocum">0</div></div>
@@ -294,6 +301,21 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
   <div id="mob-ctas-lista"></div>
 </div>
 
+<div id="page-mapa" class="page">
+  <button class="phase-btn" style="width:100%;margin-bottom:10px" onclick="ubicarmeMob()">📍 Actualizar mi ubicación</button>
+  <div id="mob-mapa" style="height:300px;border-radius:12px;overflow:hidden;background:var(--bg2)"></div>
+  <div class="card" style="margin-top:12px">
+    <div class="card-title">Guardar dónde estoy</div>
+    <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">Parado en la puerta del banco, elegilo de la lista y guardá. Queda cargado para todo el equipo.</div>
+    <select class="fi" id="mob-lugar-sel" style="margin-bottom:8px"></select>
+    <button class="phase-btn" style="width:100%" onclick="guardarLugarAquiMob()">📌 Guardar esta ubicación</button>
+  </div>
+  <div class="card" style="margin-top:12px">
+    <div class="card-title">Lugares guardados</div>
+    <div id="mob-lugares-lista"></div>
+  </div>
+</div>
+
 <div id="page-acuses" class="page">
   <div id="mob-acuses-lista"></div>
 </div>
@@ -320,6 +342,9 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
   </button>
   <button class="nav-btn" id="nav-ctas" onclick="showMobPage('ctas',this)">
     <i class="ti ti-credit-card"></i><span>Cuentas</span>
+  </button>
+  <button class="nav-btn" id="nav-mapa" onclick="showMobPage('mapa',this)">
+    <i class="ti ti-map-pin"></i><span>Mapa</span>
   </button>
   <button class="nav-btn" id="nav-acuses" onclick="showMobPage('acuses',this)">
     <i class="ti ti-paperclip"></i><span>Acuses</span>
@@ -366,10 +391,14 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
             <option value="cartera">Operación de compra de cartera</option>
           </optgroup>
         </select>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <button class="phase-btn" type="button" style="flex:1" onclick="agregarTareaGenMob()">➕ Agregar a la lista</button>
+          <button class="phase-btn" type="button" id="mt-gen-quitar-mob" style="flex:1;display:none" onclick="borrarTareaGenMob()">🗑️ Quitar</button>
+        </div>
       </div>
     </div>
     <div class="fgrp" id="mt-gen-dueno-box-mob" style="display:none"><span class="flabel">Dueños de los pagarés</span><div id="mt-duenos-mob"></div><button class="phase-btn" type="button" style="flex:none;width:auto;padding:8px 12px" onclick="agregarFilaGenMob('dueno')">+ Agregar otro pagaré</button></div>
-    <div class="fgrp" id="mt-gen-imp-box-mob" style="display:none"><span class="flabel">Importe de cada cheque</span><div id="mt-cheques-mob"></div><button class="phase-btn" type="button" style="flex:none;width:auto;padding:8px 12px" onclick="agregarFilaGenMob('cheque')">+ Agregar otro cheque</button></div>
+    <div class="fgrp" id="mt-gen-imp-box-mob" style="display:none"><span class="flabel">Importe de cada cheque</span><select class="fi" id="mt-gen-imp-mon-mob" style="margin-bottom:6px" onchange="actualizarVistaPreviaMob()"><option value="GS">Guaraníes</option><option value="USD">USD</option></select><div id="mt-cheques-mob"></div><button class="phase-btn" type="button" style="flex:none;width:auto;padding:8px 12px" onclick="agregarFilaGenMob('cheque')">+ Agregar otro cheque</button></div>
     <div class="fgrp" id="mt-gen-solic-box-mob" style="display:none"><span class="flabel">Tipo de solicitud</span>
       <select class="fi" id="mt-gen-solic-mob" onchange="setGenTareaMob()">
         <option value="Préstamo">Préstamo</option>
@@ -615,6 +644,7 @@ function showMobPage(id,el){
   if(id==="jour")renderJournal();
   if(id==="scan"){if(!document.getElementById("mob-fecha-acred").value)document.getElementById("mob-fecha-acred").value=today();applyScanModeVisibility();}
   if(id==="ctas")renderCuentas();
+  if(id==="mapa"){renderSelLugaresMob();renderLugaresMob();renderMapaMob();}
   if(id==="acuses")renderAcuses();
 }
 
@@ -723,7 +753,7 @@ function renderJournal(){
         <div class="task-check ${isDone&&!noCum?"done":""}" style="${noCum?"background:var(--al);border-color:var(--amber)":""}" onclick="mobCycle(${t.id})">${isDone?`<i class="ti ${noCum?"ti-alert-triangle":"ti-check"}" style="font-size:12px;${noCum?"color:var(--amber)":""}"></i>`:""}</div>
         <div class="task-body">
           <div class="task-txt ${isDone&&!noCum?"done":""}">${t.txt}${noCumTag}</div>
-          <div class="task-meta">${tipoTag}${monTag}${bancoTag}${nomTag}${montoTag}</div>${htmlChequesTareaMob(t)}
+          <div class="task-meta">${tipoTag}${monTag}${bancoTag}${nomTag}${montoTag}${chipDistanciaMob(t)}</div>${htmlChequesTareaMob(t)}
           ${phaseBtns}${noCumBtn}${cronoHtml}${motivoHtml}${obsHtml}${acuseBtnHtml}
         </div>
         <button onclick="mobDelT(${t.id})" style="border:none;background:none;color:var(--tx3);font-size:18px;padding:4px;cursor:pointer"><i class="ti ti-trash"></i></button>
@@ -748,6 +778,7 @@ function renderJournal(){
     if(!items.length){el.innerHTML="";return;}
     el.innerHTML=`<div style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;padding:8px 0 4px">${PRI_LBL[p]}</div>`+items.map(itemMob).join("");
   });
+  renderSugerenciaMob(hT.filter(function(t){return t.st!=="done";}));
   document.getElementById("j-empty-mob").style.display=hT.length?"none":"block";
   // mañana
   const mc=document.getElementById("jm-manana-card"),ml=document.getElementById("jm-manana");
@@ -766,7 +797,7 @@ function mobIniciar(id){
   t.st="en_camino";t.cronoFase="calle";t.cronoInicio=Date.now();t.startedAt=Date.now();t.calleMs=0;t.bancoMs=0;t.totalMs=0;
   delete t.tCalle;delete t.tBanco;delete t.tTotal;
   sv();
-  if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"iniciada",txt:t.txt,taskId:id});
+  if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"iniciada",nombre:miPerfilMob.nombre,color:miPerfilMob.color,txt:t.txt,taskId:id});
   toast("🚶 En camino...","var(--amber)");renderJournal();
 }
 function mobBanco(id){
@@ -775,7 +806,7 @@ function mobBanco(id){
   limpiarAnclas(id);                   // y arranca un ancla nueva para la etapa de banco
   t.cronoFase="banco";t.cronoInicio=Date.now();
   t.st="en_banco";t.bancoMs=0;sv();
-  if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"banco",txt:t.txt,taskId:id,tCalle:fmtT(t.calleMs)});
+  if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"banco",nombre:miPerfilMob.nombre,color:miPerfilMob.color,txt:t.txt,taskId:id,tCalle:fmtT(t.calleMs)});
   toast("🏦 Llegaste al banco","var(--blue)");renderJournal();
 }
 // ── Resultado de una tarea cerrada ──
@@ -826,7 +857,7 @@ function mobTerminar(id,resultado,motivo){
   agenda.push({id:nA++,txt:t.txt,tipo:t.tipo,pri:t.pri,mon:t.mon,monto:t.monto,banco:t.banco,nom:t.nom,fecha:today(),completada:today(),tCalle,tBanco,tTotal,calleMs:t.calleMs,bancoMs:t.bancoMs,totalMs:t.totalMs,startedAt:t.startedAt||0,doneAt:t.doneAt||0,obs:t.obs||"",asignado:t.asignado||"",resultado:t.resultado||"cumplido",motivo:t.motivo||""});
   t.agendaId=agId; // para que el botón "Agregar acuse" (opcional, se toca cuando quieras) sepa a qué registro del historial ligar la foto
   sv();
-  if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"completada",txt:t.txt,taskId:id,tCalle,tBanco,tTotal,calleMs:t.calleMs,bancoMs:t.bancoMs,totalMs:t.totalMs,resultado:t.resultado,motivo:t.motivo||""});
+  if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"completada",nombre:miPerfilMob.nombre,color:miPerfilMob.color,txt:t.txt,taskId:id,tCalle,tBanco,tTotal,calleMs:t.calleMs,bancoMs:t.bancoMs,totalMs:t.totalMs,resultado:t.resultado,motivo:t.motivo||""});
   renderJournal();
   if(t.resultado==="no_cumplido")toast("⚠️ Marcada como NO cumplida — "+t.motivo,"var(--amber)");
   else toast("✅ Tarea completada — Calle: "+tCalle+" | Banco: "+tBanco+" | Total: "+tTotal,"var(--green)");
@@ -948,13 +979,222 @@ function mobCycle(id){
   t.agendaId=agId2;
   sv();renderJournal();
 }
-function mobDelT(id){tareas=tareas.filter(t=>t.id!==id);
+// Antes bastaba un toque en el tacho para que la tarea desapareciera, y en el
+// celular es fácil darle sin querer. Ahora pregunta y muestra cuál se va.
+function mobDelT(id){
+  const tar=tareas.find(t=>t.id===id);
+  if(!tar)return;
+  if(!confirm("¿Eliminar esta tarea?\n\n"+(tar.txt||"")))return;
+  tareas=tareas.filter(t=>t.id!==id);
   // Si esta era la ultima tarea, el envio deja la lista en cero y el freno
   // anti-borrado lo descartaria. Se avisa que es a proposito para que pase.
   if(!tareas.length&&window.FDSupabase&&window.FDSupabase.marcarBorradoDeliberado)window.FDSupabase.marcarBorradoDeliberado();
   sv();renderJournal();}
 function mobMoveHoy(id){const t=tareas.find(t=>t.id===id);if(t){t.para="hoy";t.st="pend";delete t.doneAt;sv();renderJournal();}}
 
+// ── Con qué perfil trabaja este celular ──
+// Los perfiles los crea la PC (Mi equipo) y viajan por la nube en
+// "fd-perfiles". Acá no se escribe el nombre a mano: se elige de esa lista,
+// así el equipo ve quién hizo cada cosa (en los avisos y en los descuentos
+// que se mandan a la PC). Igual se puede agregar uno nuevo desde el celular.
+const COLORES_PERFIL=["#185FA5","#1D9E75","#D85A30","#854F0B","#534AB7"];
+let perfilesEquipo=(()=>{try{return JSON.parse(localStorage.getItem("ft-mob-perfiles")||"[]")||[];}catch(e){return [];}})();
+let miPerfilMob=(()=>{try{return JSON.parse(localStorage.getItem("ft-mob-perfil")||"null")||{nombre:"",color:""};}catch(e){return {nombre:"",color:""};}})();
+function colorDePerfil(nombre){
+  const p=perfilesEquipo.filter(x=>x&&x.nombre===nombre)[0];
+  return (p&&p.color)||miPerfilMob.color||"#185FA5";
+}
+function renderPerfilMob(){
+  const sel=document.getElementById("mob-perfil-sel");if(!sel)return;
+  sel.innerHTML="";
+  const vacio=document.createElement("option");
+  vacio.value="";vacio.textContent=perfilesEquipo.length?"👤 Elegí tu perfil":"👤 Sin perfil — agregá uno";
+  sel.appendChild(vacio);
+  perfilesEquipo.forEach(p=>{
+    if(!p||!p.nombre)return;
+    const o=document.createElement("option");o.value=p.nombre;o.textContent="👤 "+p.nombre;sel.appendChild(o);
+  });
+  const nuevo=document.createElement("option");
+  nuevo.value="__nuevo__";nuevo.textContent="➕ Otro nombre...";sel.appendChild(nuevo);
+  sel.value=miPerfilMob.nombre||"";
+  const punto=document.getElementById("mob-perfil-punto");
+  if(punto)punto.style.background=miPerfilMob.nombre?colorDePerfil(miPerfilMob.nombre):"var(--bd)";
+}
+function guardarMiPerfilMob(){
+  try{localStorage.setItem("ft-mob-perfil",JSON.stringify(miPerfilMob));}catch(e){}
+}
+function elegirPerfilMob(){
+  const sel=document.getElementById("mob-perfil-sel");
+  if(sel.value==="__nuevo__"){
+    const n=(prompt("¿Cómo te llamás?\n\nQueda en la lista del equipo y también la ve la PC.")||"").replace(/\s+/g," ").trim();
+    if(!n){renderPerfilMob();return;}
+    if(!perfilesEquipo.some(p=>p&&p.nombre.toLowerCase()===n.toLowerCase())){
+      perfilesEquipo.push({nombre:n,color:COLORES_PERFIL[perfilesEquipo.length%COLORES_PERFIL.length]});
+      try{localStorage.setItem("ft-mob-perfiles",JSON.stringify(perfilesEquipo));}catch(e){}
+      if(window.FDSupabase&&window.FDSupabase.estaListoParaEscribir())window.FDSupabase.saveKey("fd-perfiles",perfilesEquipo);
+    }
+    miPerfilMob={nombre:n,color:colorDePerfil(n)};
+  }else{
+    miPerfilMob=sel.value?{nombre:sel.value,color:colorDePerfil(sel.value)}:{nombre:"",color:""};
+  }
+  guardarMiPerfilMob();renderPerfilMob();
+  if(miPerfilMob.nombre){
+    if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"presencia",nombre:miPerfilMob.nombre,color:miPerfilMob.color});
+    toast("Estás como "+miPerfilMob.nombre,"var(--green)");
+  }
+}
+// ── Mapa de bancos y distancias ──
+// Cada banco guarda su ubicación, tomada con el GPS parado en la puerta. Se
+// carga una sola vez y viaja por la nube ("fd-lugares"), así la tienen todos.
+// Con eso el celular puede ordenar las tareas pendientes por cercanía.
+let lugares=(function(){try{return JSON.parse(localStorage.getItem("ft-mob-lugares")||"{}")||{};}catch(e){return {};}})();
+let miUbicacion=null;
+function guardarLugares(){
+  try{localStorage.setItem("ft-mob-lugares",JSON.stringify(lugares));}catch(e){}
+  if(window.FDSupabase&&window.FDSupabase.estaListoParaEscribir())window.FDSupabase.saveKey("fd-lugares",lugares);
+}
+function claveLugar(nombre){
+  return String(nombre||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
+}
+function lugarDe(nombre){
+  var k=claveLugar(nombre);
+  return k&&lugares[k]?lugares[k]:null;
+}
+// Distancia en línea recta entre dos puntos (fórmula del haversine).
+function distanciaMetros(a,b){
+  if(!a||!b||a.lat==null||b.lat==null)return null;
+  var R=6371000,r=Math.PI/180;
+  var dLat=(b.lat-a.lat)*r,dLng=(b.lng-a.lng)*r;
+  var h=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return Math.round(2*R*Math.asin(Math.min(1,Math.sqrt(h))));
+}
+function textoDistancia(m){
+  if(m==null)return "";
+  if(m<1000)return m+" m";
+  return (m/1000).toFixed(1).replace(".",",")+" km";
+}
+// A paso normal se caminan unos 80 metros por minuto.
+function minutosAPie(m){return m==null?null:Math.max(1,Math.round(m/80));}
+function distanciaDeTarea(t){
+  if(!miUbicacion||!t||!t.banco)return null;
+  var l=lugarDe(t.banco);
+  return l?distanciaMetros(miUbicacion,l):null;
+}
+// Tareas pendientes ordenadas de la más cerca a la más lejos. Las que no
+// tienen banco o cuyo banco todavía no tiene ubicación quedan al final.
+function tareasPorCercania(lista){
+  return (lista||[]).map(function(t){return {t:t,d:distanciaDeTarea(t)};})
+    .sort(function(a,b){
+      if(a.d==null&&b.d==null)return 0;
+      if(a.d==null)return 1;
+      if(b.d==null)return -1;
+      return a.d-b.d;
+    });
+}
+function pedirMiUbicacion(alTenerla,alFallar){
+  if(!navigator.geolocation){if(alFallar)alFallar("Este dispositivo no tiene GPS.");return;}
+  navigator.geolocation.getCurrentPosition(function(pos){
+    miUbicacion={lat:pos.coords.latitude,lng:pos.coords.longitude,precision:Math.round(pos.coords.accuracy||0),ts:Date.now()};
+    if(alTenerla)alTenerla(miUbicacion);
+  },function(err){
+    if(alFallar)alFallar(err&&err.code===1?"Hay que permitir el acceso a la ubicación.":"No se pudo leer el GPS. Probá al aire libre.");
+  },{enableHighAccuracy:true,timeout:15000,maximumAge:30000});
+}
+// Todos los bancos de las dos empresas, sin repetir, más la oficina.
+function nombresDeLugares(){
+  var vistos={},out=["Oficina"];
+  ["tracto","agri"].forEach(function(e){
+    (CTAS[e]||[]).forEach(function(c){if(c&&c.b&&!vistos[c.b]){vistos[c.b]=1;out.push(c.b);}});
+  });
+  return out;
+}
+let mapaMob=null,capaMapaMob=null;
+function renderSelLugaresMob(){
+  var sel=document.getElementById("mob-lugar-sel");if(!sel)return;
+  var antes=sel.value;
+  sel.innerHTML="";
+  nombresDeLugares().forEach(function(n){
+    var o=document.createElement("option");o.value=n;
+    o.textContent=(lugarDe(n)?"✅ ":"")+n;
+    sel.appendChild(o);
+  });
+  if(antes)sel.value=antes;
+}
+function ubicarmeMob(){
+  toast("Buscando tu ubicación...","var(--blue)");
+  pedirMiUbicacion(function(u){
+    toast("📍 Ubicación lista (±"+u.precision+" m)","var(--green)");
+    renderMapaMob();renderLugaresMob();renderJournal();
+  },function(msg){toast(msg,"#A32D2D");});
+}
+function guardarLugarAquiMob(){
+  if(!miUbicacion){toast("Primero tocá «Actualizar mi ubicación»","#A32D2D");return;}
+  var nombre=document.getElementById("mob-lugar-sel").value;
+  if(!nombre)return;
+  var viejo=lugarDe(nombre);
+  if(viejo&&!confirm("«"+nombre+"» ya tiene una ubicación guardada.\n\n¿La reemplazás por donde estás ahora?"))return;
+  lugares[claveLugar(nombre)]={nombre:nombre,lat:miUbicacion.lat,lng:miUbicacion.lng,precision:miUbicacion.precision,ts:Date.now(),por:miPerfilMob.nombre||""};
+  guardarLugares();renderSelLugaresMob();renderLugaresMob();renderMapaMob();renderJournal();
+  toast("📌 "+nombre+" guardado","var(--green)");
+}
+function borrarLugarMob(clave){
+  var l=lugares[clave];
+  if(!l||!confirm("¿Borrar la ubicación de «"+l.nombre+"»?"))return;
+  delete lugares[clave];
+  guardarLugares();renderSelLugaresMob();renderLugaresMob();renderMapaMob();renderJournal();
+}
+function renderLugaresMob(){
+  var cont=document.getElementById("mob-lugares-lista");if(!cont)return;
+  var claves=Object.keys(lugares);
+  if(!claves.length){cont.innerHTML='<div style="font-size:12px;color:var(--tx2)">Todavía no hay ninguna ubicación guardada.</div>';return;}
+  cont.innerHTML=claves.map(function(k){
+    var l=lugares[k],d=miUbicacion?distanciaMetros(miUbicacion,l):null;
+    return '<div class="ocr-field"><span class="ocr-field-lbl">'+l.nombre+(d!=null?' · '+textoDistancia(d):'')+'</span>'
+      +'<span class="ocr-field-val" style="font-weight:400;color:#A32D2D;cursor:pointer" onclick="borrarLugarMob(\''+k+'\')">Borrar</span></div>';
+  }).join("");
+}
+function renderMapaMob(){
+  var div=document.getElementById("mob-mapa");if(!div)return;
+  if(!window.L){div.innerHTML='<div style="padding:16px;font-size:12px;color:var(--tx2)">El mapa necesita internet para dibujarse. Las distancias igual funcionan.</div>';return;}
+  if(!mapaMob){
+    mapaMob=L.map(div).setView([-25.3,-57.6],13);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(mapaMob);
+  }
+  if(capaMapaMob)capaMapaMob.remove();
+  capaMapaMob=L.layerGroup().addTo(mapaMob);
+  var puntos=[];
+  Object.keys(lugares).forEach(function(k){
+    var l=lugares[k];
+    L.marker([l.lat,l.lng]).bindPopup("<b>"+l.nombre+"</b>").addTo(capaMapaMob);
+    puntos.push([l.lat,l.lng]);
+  });
+  if(miUbicacion){
+    L.circleMarker([miUbicacion.lat,miUbicacion.lng],{radius:8,color:"#185FA5",fillColor:"#185FA5",fillOpacity:.9}).bindPopup("Acá estás vos").addTo(capaMapaMob);
+    puntos.push([miUbicacion.lat,miUbicacion.lng]);
+  }
+  setTimeout(function(){
+    mapaMob.invalidateSize();
+    if(puntos.length===1)mapaMob.setView(puntos[0],16);
+    else if(puntos.length>1)mapaMob.fitBounds(puntos,{padding:[30,30]});
+  },120);
+}
+// Distancia al banco de la tarea, para mostrar al lado del nombre.
+function chipDistanciaMob(t){
+  var d=distanciaDeTarea(t);
+  if(d==null)return "";
+  return '<span class="tag" style="background:var(--gl);color:var(--green)">📍 '+textoDistancia(d)+'</span>';
+}
+// "Lo más cerca ahora": la tarea pendiente cuyo banco está más próximo.
+function renderSugerenciaMob(pendientes){
+  var box=document.getElementById("mob-sugerencia");if(!box)return;
+  if(!miUbicacion||!pendientes.length){box.style.display="none";return;}
+  var orden=tareasPorCercania(pendientes).filter(function(x){return x.d!=null;});
+  if(!orden.length){box.style.display="none";return;}
+  var p=orden[0];
+  box.style.display="block";
+  box.innerHTML="<b>📍 Empezá por "+p.t.banco+"</b> — "+textoDistancia(p.d)+" (unos "+minutosAPie(p.d)+" min a pie)"
+    +(orden.length>1?'<div style="color:var(--tx2);margin-top:3px">Después: '+orden.slice(1,4).map(function(x){return x.t.banco+" ("+textoDistancia(x.d)+")";}).join(" · ")+"</div>":"");
+}
 // ── MODAL TAREA ──
 function setSeg(segId,idx,cls){document.querySelectorAll("#"+segId+" .seg-opt").forEach((b,i)=>b.className="seg-opt"+(i===idx?" "+cls:""));}
 function openModalTarea(){
@@ -1044,6 +1284,8 @@ function setGenTareaMob(){
   // La descripción a mano quedó solo para "Otros": en todo lo demás —incluidos
   // depósitos y retiros— el texto se arma solo con los datos cargados.
   ver("mt-txt-box-mob",esGen&&g==="otro");
+  const btnQuitar=document.getElementById("mt-gen-quitar-mob");
+  if(btnQuitar)btnQuitar.style.display=(esGen&&g.indexOf("propia:")===0)?"block":"none";
   actualizarVistaPreviaMob();
   const lbl=document.getElementById("mt-banco-lbl-mob");
   if(lbl&&esGen)lbl.textContent=TAREAS_CON_BANCO.indexOf(g)>=0?"Banco":"¿A qué banco vas? (opcional)";
@@ -1115,6 +1357,7 @@ function valoresGenMob(cual){
 }
 function reiniciarFilasGenMob(){
   ["mt-duenos-mob","mt-cheques-mob"].forEach(function(id){var c=document.getElementById(id);if(c)c.innerHTML="";});
+  const monRechMob=document.getElementById("mt-gen-imp-mon-mob");if(monRechMob)monRechMob.value="GS";
   agregarFilaGenMob("dueno");agregarFilaGenMob("cheque");
 }
 // "Artigas", "Artigas y Hermes", "Artigas, Hermes y Fernando"
@@ -1129,9 +1372,62 @@ function listaEnTextoMob(a){
 // formal ("Retiro de…", "Entrega de…", "Pago de…").
 var TAREAS_CON_BANCO=["pagare","rechazado","chequera","descuento","cartera"];
 var TAREAS_CON_IMPORTE=["ande","copaco","descuento","cartera"];
+// ── Tareas propias en la lista de tareas generales ──
+// Las que agrega el usuario con "Agregar a la lista". Quedan guardadas en el
+// celular y se comparten con la PC por la nube ("fd-tareasgen"), así los dos
+// ven la misma lista. Aparecen en el grupo "Mis tareas", arriba de todo.
+let tareasGen=(()=>{try{return JSON.parse(localStorage.getItem("ft-mob-tareasgen")||"[]")||[];}catch(e){return [];}})();
+function guardarTareasGen(){
+  try{localStorage.setItem("ft-mob-tareasgen",JSON.stringify(tareasGen));}catch(e){}
+  if(window.FDSupabase&&window.FDSupabase.estaListoParaEscribir())window.FDSupabase.saveKey("fd-tareasgen",tareasGen);
+}
+function renderTareasGen(){
+  const sel=document.getElementById("mt-gen-tarea-mob");if(!sel)return;
+  let g=sel.querySelector("optgroup[data-propias]");
+  if(!tareasGen.length){if(g)g.parentNode.removeChild(g);return;}
+  if(!g){
+    g=document.createElement("optgroup");g.label="Mis tareas";g.setAttribute("data-propias","1");
+    sel.insertBefore(g,sel.children[1]||null);
+  }
+  const elegido=sel.value;
+  g.innerHTML="";
+  tareasGen.forEach(t=>{const o=document.createElement("option");o.value="propia:"+t.id;o.textContent=t.txt;g.appendChild(o);});
+  if(elegido)sel.value=elegido;
+}
+function tareaPropiaDe(valor){
+  const t=tareasGen.filter(x=>"propia:"+x.id===valor)[0];
+  return t?t.txt:"";
+}
+function agregarTareaGenMob(){
+  const txt=(prompt("¿Cómo se llama la tarea?\n\nQueda guardada para siempre y también aparece en la PC.")||"").replace(/\s+/g," ").trim();
+  if(!txt)return;
+  if(tareasGen.some(t=>t.txt.toLowerCase()===txt.toLowerCase())){toast("Esa tarea ya está en la lista","#A32D2D");return;}
+  const id=Date.now();
+  tareasGen.push({id,txt});
+  guardarTareasGen();renderTareasGen();
+  document.getElementById("mt-gen-tarea-mob").value="propia:"+id;
+  setGenTareaMob();
+  toast("✅ Tarea agregada a la lista","var(--green)");
+}
+function borrarTareaGenMob(){
+  const v=document.getElementById("mt-gen-tarea-mob").value;
+  const t=tareasGen.filter(x=>"propia:"+x.id===v)[0];
+  if(!t||!confirm('¿Quitar "'+t.txt+'" de la lista?'))return;
+  tareasGen=tareasGen.filter(x=>x.id!==t.id);
+  guardarTareasGen();renderTareasGen();
+  document.getElementById("mt-gen-tarea-mob").value="otro";
+  setGenTareaMob();
+}
+// Moneda de los cheques rechazados: un retiro es siempre de una sola moneda,
+// así que se elige una vez para todos los cheques de la tarea.
+function monedaChequesRechMob(){
+  const e=document.getElementById("mt-gen-imp-mon-mob");
+  return (e&&e.value==="USD")?"USD":"";
+}
 function textoGenTareaMob(banco){
   const g=document.getElementById("mt-gen-tarea-mob").value;
   if(g==="otro")return document.getElementById("mt-txt-mob").value.trim();
+  if(g.indexOf("propia:")===0){const tp=tareaPropiaDe(g);return tp?(tp+(banco?" — "+banco:"")):"";}
   if(g==="pagare"){
     const duenos=valoresGenMob("dueno"),conNombre=duenos.filter(Boolean),n=Math.max(1,duenos.length);
     return (n>1?"Retiro de "+n+" pagarés":"Retiro de pagaré")
@@ -1143,7 +1439,7 @@ function textoGenTareaMob(banco){
     const imps=valoresGenMob("cheque"),n=Math.max(1,imps.length);
     const total=imps.reduce((a,v)=>a+(parseFloat(v)||0),0);
     return "Retiro de "+(n>1?n+" cheques rechazados":"cheque rechazado")
-      +(banco?" — "+banco:"")+(total>0?" · "+fM(total,""):"");
+      +(banco?" — "+banco:"")+(total>0?" · "+fM(total,monedaChequesRechMob()):"");
   }
   if(g==="solicitud"){
     let x=document.getElementById("mt-gen-solic-mob").value;
@@ -1214,6 +1510,7 @@ function guardarTareaMob(){
     genImporte:genTarea==="rechazado"?valoresGenMob("cheque").reduce((a,v)=>a+(parseFloat(v)||0),0):(TAREAS_CON_IMPORTE.indexOf(genTarea)>=0?(parseFloat(document.getElementById("mt-gen-importe-mob").value)||0):0),
     genDestino:genTarea==="recibo"?document.getElementById("mt-gen-destino-mob").value.trim():"",
     genImportes:genTarea==="rechazado"?valoresGenMob("cheque").map(v=>parseFloat(v)||0).filter(v=>v>0):[],
+    genMon:genTarea==="rechazado"?(monedaChequesRechMob()==="USD"?"USD":"GS"):"",
     genSolic:genTarea==="solicitud"?(document.getElementById("mt-gen-solic-mob").value==="otro"?document.getElementById("mt-gen-solic-otro-mob").value.trim():document.getElementById("mt-gen-solic-mob").value):"",pri:mtPri,st:"pend",para:"hoy",tipo:mtTipo,mon:mtTipo!=="general"?mtMon:"",inst:mtTipo!=="general"?mtInst:"",canal:mtTipo!=="general"?mtCanal:"",monto:mtTipo!=="general"?monto:0,tc:7850,banco:bp[0]||"",numcta:bp[1]||"",nom:document.getElementById("mt-nom-mob").value,obs:(document.getElementById("mt-obs-mob").value||"").trim(),emp,fecha:today()});
   sv();closeMobModal();renderJournal();toast("✅ Tarea agregada","var(--green)");
   if(window.FDSupabase)window.FDSupabase.sendPushTrigger("🚜 Finanzas Tracto — Nueva tarea",txt+(bp[0]?" — "+bp[0]:"")+(monto?" · "+monto:""));
@@ -1774,6 +2071,7 @@ function mobGuardarDescuento(){
     importe:document.getElementById("desc-importe").value.trim(),
     venc:document.getElementById("desc-venc").value||"",
     cliente:nombrePropio(document.getElementById("desc-cliente").value),
+    enviadoPor:miPerfilMob.nombre||"",
     tipoDoc:document.getElementById("desc-tipodoc").value.trim(),
     emision:document.getElementById("desc-emision").value||""
   };
@@ -1826,6 +2124,8 @@ document.getElementById("modal-acuse-mob").addEventListener("click",function(e){
 
 // ── INIT ──
 fillBancosMob();
+renderTareasGen();
+renderPerfilMob();
 renderJournal();
 renderOficinaMob();
 renderCuentas();
@@ -2022,6 +2322,9 @@ function applyRemoteChangeMob(key,value){
   else if(key==="fd-desc"){descuentos=value;nD=descuentos.length?Math.max(0,...descuentos.map(d=>d.id))+1:1;if(document.getElementById("desc-lista"))renderDescuentosList();}
   else if(key==="fd-depo"){depositos=value;nDp=depositos.length?Math.max(0,...depositos.map(d=>d.id))+1:1;if(document.getElementById("depo-lista"))renderDepositosList();}
   else if(key==="fd-notas"){notasJ=value;}
+  else if(key==="fd-lugares"){lugares=(value&&typeof value==="object")?value:{};try{localStorage.setItem("ft-mob-lugares",JSON.stringify(lugares));}catch(e){}renderLugaresMob();renderMapaMob();return;}
+  else if(key==="fd-perfiles"){perfilesEquipo=Array.isArray(value)?value:[];try{localStorage.setItem("ft-mob-perfiles",JSON.stringify(perfilesEquipo));}catch(e){}renderPerfilMob();return;}
+  else if(key==="fd-tareasgen"){tareasGen=Array.isArray(value)?value:[];try{localStorage.setItem("ft-mob-tareasgen",JSON.stringify(tareasGen));}catch(e){}renderTareasGen();return;}
   else if(key==="fd-oficina"){oficina=Object.assign({activo:false,lugar:"",inicio:null,hist:[]},value);oficinaAnchor=null;renderOficinaMob();}
   try{
     if(key==="fd-tar")localStorage.setItem("ft-mob-tar",JSON.stringify(tareas));
@@ -2092,6 +2395,9 @@ async function ftResyncMob(){
   if(remote["fd-desc"]!=null){descuentos=remote["fd-desc"];hubo=true;}
   if(remote["fd-depo"]!=null){depositos=remote["fd-depo"];hubo=true;}
   if(remote["fd-notas"]!=null&&remote["fd-notas"]!==""){notasJ=remote["fd-notas"];hubo=true;}
+  if(remote["fd-lugares"]&&typeof remote["fd-lugares"]==="object"){lugares=remote["fd-lugares"];try{localStorage.setItem("ft-mob-lugares",JSON.stringify(lugares));}catch(e){}renderLugaresMob();}
+  if(Array.isArray(remote["fd-perfiles"])){perfilesEquipo=remote["fd-perfiles"];try{localStorage.setItem("ft-mob-perfiles",JSON.stringify(perfilesEquipo));}catch(e){}renderPerfilMob();}
+  if(Array.isArray(remote["fd-tareasgen"])){tareasGen=remote["fd-tareasgen"];try{localStorage.setItem("ft-mob-tareasgen",JSON.stringify(tareasGen));}catch(e){}renderTareasGen();}
   if(remote["fd-oficina"]!=null){oficina=Object.assign({activo:false,lugar:"",inicio:null,hist:[]},remote["fd-oficina"]);oficinaAnchor=null;hubo=true;}
   nO=ops.length?Math.max(0,...ops.map(o=>o.id))+1:1;
   nA=agenda.length?Math.max(0,...agenda.map(a=>a.id))+1:1;

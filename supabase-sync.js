@@ -114,7 +114,7 @@
     const { data, error } = await client
       .from("fd_store")
       .select("key,value")
-      .in("key", ["fd-tar", "fd-ops", "fd-agenda", "fd-desc", "fd-depo", "fd-notas", "fd-oficina", "fd-cierre"]);
+      .in("key", ["fd-tar", "fd-ops", "fd-agenda", "fd-desc", "fd-depo", "fd-notas", "fd-oficina", "fd-cierre", "fd-tareasgen", "fd-perfiles", "fd-lugares"]);
     if (error) {
       console.error("[FinTracto] Error cargando datos de Supabase:", error.message);
       return null;
@@ -252,7 +252,7 @@
         (payload) => {
           const row = payload.new && Object.keys(payload.new).length ? payload.new : payload.old;
           if (!row) return;
-          if (!["fd-tar", "fd-ops", "fd-agenda", "fd-desc", "fd-depo", "fd-notas", "fd-oficina", "fd-cierre"].includes(row.key)) return;
+          if (!["fd-tar", "fd-ops", "fd-agenda", "fd-desc", "fd-depo", "fd-notas", "fd-oficina", "fd-cierre", "fd-tareasgen", "fd-perfiles", "fd-lugares"].includes(row.key)) return;
           const str = JSON.stringify(row.value);
           if (lastSeen[row.key] === str) return; // eco de un cambio propio, se ignora
           lastSeen[row.key] = str;
@@ -424,6 +424,7 @@
   window.FDSupabase = {
     loadAll,
     pushAll,
+    saveKey,
     hasPendingPush,
     estaListoParaEscribir,
     hayFilasEnLaNube,
