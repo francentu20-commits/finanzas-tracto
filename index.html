@@ -137,7 +137,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
     <svg width="26" height="26" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#F5C200"/><circle cx="145" cy="330" r="90" fill="#1a1a1a"/><circle cx="145" cy="330" r="50" fill="#eee"/><circle cx="145" cy="330" r="22" fill="#1a1a1a"/><circle cx="355" cy="345" r="55" fill="#1a1a1a"/><circle cx="355" cy="345" r="28" fill="#eee"/><rect x="110" y="180" width="290" height="120" rx="18" fill="#1a1a1a"/><rect x="270" y="110" width="130" height="100" rx="18" fill="#1a1a1a"/><rect x="278" y="118" width="114" height="76" rx="10" fill="#a8d8f0" opacity=".85"/></svg>
     Finanzas Tracto
     <!-- Versión visible. Tiene que coincidir en la PC, en el celular y en el CACHE de sw.js del celular: si alguno dice otro número, ese equipo no tiene la última versión. Se sube junto con cada cambio. -->
-    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v53</span>
+    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v58</span>
   </div>
   <button class="emp-switch" onclick="toggleEmp()" id="emp-btn">Tracto</button>
 </div>
@@ -159,6 +159,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
   </div>
   <div class="pbar"><div class="pfill" id="j-bar-mob" style="width:0%"></div></div>
   <div id="mob-sugerencia" style="display:none;margin-top:10px;background:var(--gl);border-left:3px solid var(--green);border-radius:8px;padding:8px 10px;font-size:12px"></div>
+  <div id="mob-compartiendo" style="display:none;margin-top:8px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:6px 10px;font-size:11px;color:var(--tx2)"></div>
   <div class="metrics">
     <div class="metric"><div class="ml">Completadas</div><div class="mv" style="color:var(--green)" id="jm-don">0</div></div>
     <div class="metric"><div class="ml">No cumplidas</div><div class="mv" style="color:var(--amber)" id="jm-nocum">0</div></div>
@@ -308,7 +309,17 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
     <div class="card-title">Guardar dónde estoy</div>
     <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">Parado en la puerta del banco, elegilo de la lista y guardá. Queda cargado para todo el equipo.</div>
     <select class="fi" id="mob-lugar-sel" style="margin-bottom:8px"></select>
+    <input class="fi" id="mob-lugar-suc" placeholder="Sucursal (opcional) — ej: Centro" style="margin-bottom:8px">
+    <select class="fi" id="mob-lugar-tipo" style="margin-bottom:8px"></select>
     <button class="phase-btn" style="width:100%" onclick="guardarLugarAquiMob()">📌 Guardar esta ubicación</button>
+  </div>
+  <div class="card" style="margin-top:12px">
+    <div class="card-title">Mientras hago una tarea</div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+      <input type="checkbox" id="mob-compartir-chk" onchange="cambiarCompartirUbic(this)" style="width:18px;height:18px">
+      <span>Que la PC vea dónde estoy mientras la tarea está en curso</span>
+    </label>
+    <div style="font-size:11px;color:var(--tx2);margin-top:6px">Se comparte solo desde que tocás «Iniciar» hasta que terminás la tarea, y solo con la app abierta. No se guarda ningún recorrido.</div>
   </div>
   <div class="card" style="margin-top:12px">
     <div class="card-title">Lugares guardados</div>
@@ -644,7 +655,7 @@ function showMobPage(id,el){
   if(id==="jour")renderJournal();
   if(id==="scan"){if(!document.getElementById("mob-fecha-acred").value)document.getElementById("mob-fecha-acred").value=today();applyScanModeVisibility();}
   if(id==="ctas")renderCuentas();
-  if(id==="mapa"){renderSelLugaresMob();renderLugaresMob();renderMapaMob();}
+  if(id==="mapa"){renderSelLugaresMob();renderLugaresMob();renderMapaMob();actualizarCompartirUbicacion();}
   if(id==="acuses")renderAcuses();
 }
 
@@ -779,6 +790,7 @@ function renderJournal(){
     el.innerHTML=`<div style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;padding:8px 0 4px">${PRI_LBL[p]}</div>`+items.map(itemMob).join("");
   });
   renderSugerenciaMob(hT.filter(function(t){return t.st!=="done";}));
+  actualizarCompartirUbicacion();
   document.getElementById("j-empty-mob").style.display=hT.length?"none":"block";
   // mañana
   const mc=document.getElementById("jm-manana-card"),ml=document.getElementById("jm-manana");
@@ -1044,11 +1056,23 @@ function elegirPerfilMob(){
   }
 }
 // ── Mapa de bancos y distancias ──
-// Cada banco guarda su ubicación, tomada con el GPS parado en la puerta. Se
-// carga una sola vez y viaja por la nube ("fd-lugares"), así la tienen todos.
-// Con eso el celular puede ordenar las tareas pendientes por cercanía.
+// Un banco puede tener VARIAS sucursales, y cada una dice para qué sirve:
+// donde atienden nuestros oficiales de cuenta, solo para depositar, o las dos
+// cosas. Se cargan con el GPS parado en la puerta (desde el celular) y viajan
+// por la nube ("fd-lugares"), así las tienen todos. Con eso el celular ordena
+// las tareas por cercanía, eligiendo para cada una la sucursal que le sirve.
+var TIPOS_LUGAR={ambos:"Depósitos y oficiales",deposito:"Solo depósitos",oficiales:"Oficiales de cuenta"};
 let lugares=(function(){try{return JSON.parse(localStorage.getItem("ft-mob-lugares")||"{}")||{};}catch(e){return {};}})();
 let miUbicacion=null;
+// Las primeras versiones guardaban un solo lugar por banco, sin sucursal ni
+// tipo. Se pasan al formato nuevo la primera vez que se abre la app.
+function migrarLugares(){
+  Object.keys(lugares).forEach(function(k){
+    var l=lugares[k];
+    if(l&&l.banco===undefined)lugares[k]={banco:l.nombre||k,sucursal:"",tipo:"ambos",lat:l.lat,lng:l.lng,precision:l.precision||0,por:l.por||"",ts:l.ts||Date.now()};
+  });
+}
+migrarLugares();
 function guardarLugares(){
   try{localStorage.setItem("ft-mob-lugares",JSON.stringify(lugares));}catch(e){}
   if(window.FDSupabase&&window.FDSupabase.estaListoParaEscribir())window.FDSupabase.saveKey("fd-lugares",lugares);
@@ -1056,9 +1080,16 @@ function guardarLugares(){
 function claveLugar(nombre){
   return String(nombre||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
 }
-function lugarDe(nombre){
-  var k=claveLugar(nombre);
-  return k&&lugares[k]?lugares[k]:null;
+// Cada sucursal tiene su propia clave: "atlas" y "atlas|centro" conviven.
+function idLugar(banco,sucursal){
+  var b=claveLugar(banco),su=claveLugar(sucursal);
+  return su?(b+"|"+su):b;
+}
+function nombreLugar(l){return l?(l.banco+(l.sucursal?" — "+l.sucursal:"")):"";}
+function lugaresDe(banco){
+  var k=claveLugar(banco);
+  return Object.keys(lugares).map(function(x){return lugares[x];})
+    .filter(function(l){return l&&claveLugar(l.banco)===k;});
 }
 // Distancia en línea recta entre dos puntos (fórmula del haversine).
 function distanciaMetros(a,b){
@@ -1075,15 +1106,34 @@ function textoDistancia(m){
 }
 // A paso normal se caminan unos 80 metros por minuto.
 function minutosAPie(m){return m==null?null:Math.max(1,Math.round(m/80));}
+// Qué sucursal le sirve a cada tarea: para depósitos y retiros, una que reciba
+// depósitos; para las tareas generales (pagarés, solicitudes, chequeras), la de
+// los oficiales de cuenta. Entre las que sirven, la más cercana. Si ninguna
+// coincide con el tipo, se usa cualquiera del banco antes que no decir nada.
+function tipoQueNecesita(t){
+  if(!t)return "";
+  if(t.tipo==="deposito"||t.tipo==="retiro")return "deposito";
+  if(t.tipo==="general")return "oficiales";
+  return "";
+}
+function lugarParaTarea(t){
+  if(!t||!t.banco)return null;
+  var todos=lugaresDe(t.banco);
+  if(!todos.length)return null;
+  var quiere=tipoQueNecesita(t);
+  var sirven=quiere?todos.filter(function(l){return l.tipo==="ambos"||l.tipo===quiere;}):todos.slice();
+  if(!sirven.length)sirven=todos.slice();
+  if(!miUbicacion)return sirven[0];
+  return sirven.sort(function(a,b){return distanciaMetros(miUbicacion,a)-distanciaMetros(miUbicacion,b);})[0];
+}
 function distanciaDeTarea(t){
-  if(!miUbicacion||!t||!t.banco)return null;
-  var l=lugarDe(t.banco);
-  return l?distanciaMetros(miUbicacion,l):null;
+  var l=lugarParaTarea(t);
+  return (miUbicacion&&l)?distanciaMetros(miUbicacion,l):null;
 }
 // Tareas pendientes ordenadas de la más cerca a la más lejos. Las que no
 // tienen banco o cuyo banco todavía no tiene ubicación quedan al final.
 function tareasPorCercania(lista){
-  return (lista||[]).map(function(t){return {t:t,d:distanciaDeTarea(t)};})
+  return (lista||[]).map(function(t){return {t:t,d:distanciaDeTarea(t),lugar:lugarParaTarea(t)};})
     .sort(function(a,b){
       if(a.d==null&&b.d==null)return 0;
       if(a.d==null)return 1;
@@ -1100,13 +1150,43 @@ function pedirMiUbicacion(alTenerla,alFallar){
     if(alFallar)alFallar(err&&err.code===1?"Hay que permitir el acceso a la ubicación.":"No se pudo leer el GPS. Probá al aire libre.");
   },{enableHighAccuracy:true,timeout:15000,maximumAge:30000});
 }
-// Todos los bancos de las dos empresas, sin repetir, más la oficina.
+// Bancos de las dos empresas, sin repetir, más la oficina y los lugares que
+// se hayan agregado a mano (una aduana, un despachante, un cliente).
 function nombresDeLugares(){
-  var vistos={},out=["Oficina"];
+  var vistos={Oficina:1},out=["Oficina"];
   ["tracto","agri"].forEach(function(e){
     (CTAS[e]||[]).forEach(function(c){if(c&&c.b&&!vistos[c.b]){vistos[c.b]=1;out.push(c.b);}});
   });
+  Object.keys(lugares).forEach(function(k){
+    var n=lugares[k]&&lugares[k].banco;
+    if(n&&!vistos[n]){vistos[n]=1;out.push(n);}
+  });
   return out;
+}
+// Para qué sirve cada sucursal. A las tres de siempre se suman las que
+// escriba el usuario ("Tesorería", "Cambio de cheques", lo que haga falta):
+// se recuerdan solas porque salen de los lugares ya guardados.
+function etiquetaTipo(tipo){return TIPOS_LUGAR[tipo]||tipo||TIPOS_LUGAR.ambos;}
+function tiposDeLugar(){
+  var out=Object.keys(TIPOS_LUGAR),vistos={};
+  out.forEach(function(t){vistos[t]=1;});
+  Object.keys(lugares).forEach(function(k){
+    var t=lugares[k]&&lugares[k].tipo;
+    if(t&&!vistos[t]){vistos[t]=1;out.push(t);}
+  });
+  return out;
+}
+function llenarSelectTipo(sel){
+  if(!sel)return;
+  var antes=sel.value;
+  sel.innerHTML="";
+  tiposDeLugar().forEach(function(t){
+    var o=document.createElement("option");o.value=t;o.textContent=etiquetaTipo(t);sel.appendChild(o);
+  });
+  var otro=document.createElement("option");
+  otro.value="__otro__";otro.textContent="➕ Otro...";
+  sel.appendChild(otro);
+  if(antes)sel.value=antes;
 }
 let mapaMob=null,capaMapaMob=null;
 function renderSelLugaresMob(){
@@ -1115,10 +1195,15 @@ function renderSelLugaresMob(){
   sel.innerHTML="";
   nombresDeLugares().forEach(function(n){
     var o=document.createElement("option");o.value=n;
-    o.textContent=(lugarDe(n)?"✅ ":"")+n;
+    var cuantas=lugaresDe(n).length;
+    o.textContent=cuantas?("✅ "+n+" ("+cuantas+")"):n;
     sel.appendChild(o);
   });
+  var otro=document.createElement("option");
+  otro.value="__otro__";otro.textContent="➕ Otro lugar...";
+  sel.appendChild(otro);
   if(antes)sel.value=antes;
+  llenarSelectTipo(document.getElementById("mob-lugar-tipo"));
 }
 function ubicarmeMob(){
   toast("Buscando tu ubicación...","var(--blue)");
@@ -1130,26 +1215,41 @@ function ubicarmeMob(){
 function guardarLugarAquiMob(){
   if(!miUbicacion){toast("Primero tocá «Actualizar mi ubicación»","#A32D2D");return;}
   var nombre=document.getElementById("mob-lugar-sel").value;
+  // Un lugar que no es banco: aduana, despacho, cliente, lo que sea.
+  if(nombre==="__otro__"){
+    nombre=(prompt("¿Qué lugar es?\n\nEj: Aduana, Despachante, Cliente Gómez")||"").replace(/\s+/g," ").trim();
+    if(!nombre){renderSelLugaresMob();return;}
+  }
   if(!nombre)return;
-  var viejo=lugarDe(nombre);
-  if(viejo&&!confirm("«"+nombre+"» ya tiene una ubicación guardada.\n\n¿La reemplazás por donde estás ahora?"))return;
-  lugares[claveLugar(nombre)]={nombre:nombre,lat:miUbicacion.lat,lng:miUbicacion.lng,precision:miUbicacion.precision,ts:Date.now(),por:miPerfilMob.nombre||""};
-  guardarLugares();renderSelLugaresMob();renderLugaresMob();renderMapaMob();renderJournal();
-  toast("📌 "+nombre+" guardado","var(--green)");
+  var sucursal=(document.getElementById("mob-lugar-suc").value||"").replace(/\s+/g," ").trim();
+  var tipo=document.getElementById("mob-lugar-tipo").value||"ambos";
+  // Una especificación propia: "Tesorería", "Cambio de cheques", lo que sea.
+  if(tipo==="__otro__"){
+    tipo=(prompt("¿Para qué sirve este lugar?\n\nEj: Tesorería, Cambio de cheques")||"").replace(/\s+/g," ").trim();
+    if(!tipo){llenarSelectTipo(document.getElementById("mob-lugar-tipo"));return;}
+  }
+  var id=idLugar(nombre,sucursal);
+  if(lugares[id]&&!confirm("«"+nombre+(sucursal?" — "+sucursal:"")+"» ya está guardado.\n\n¿Lo reemplazás por donde estás ahora?"))return;
+  lugares[id]={banco:nombre,sucursal:sucursal,tipo:tipo,lat:miUbicacion.lat,lng:miUbicacion.lng,precision:miUbicacion.precision,ts:Date.now(),por:miPerfilMob.nombre||""};
+  guardarLugares();
+  document.getElementById("mob-lugar-suc").value="";
+  renderSelLugaresMob();renderLugaresMob();renderMapaMob();renderJournal();
+  toast("📌 "+nombre+(sucursal?" — "+sucursal:"")+" guardado","var(--green)");
 }
-function borrarLugarMob(clave){
-  var l=lugares[clave];
-  if(!l||!confirm("¿Borrar la ubicación de «"+l.nombre+"»?"))return;
-  delete lugares[clave];
+function borrarLugarMob(id){
+  var l=lugares[id];
+  if(!l||!confirm("¿Borrar la ubicación de «"+nombreLugar(l)+"»?"))return;
+  delete lugares[id];
   guardarLugares();renderSelLugaresMob();renderLugaresMob();renderMapaMob();renderJournal();
 }
 function renderLugaresMob(){
   var cont=document.getElementById("mob-lugares-lista");if(!cont)return;
-  var claves=Object.keys(lugares);
-  if(!claves.length){cont.innerHTML='<div style="font-size:12px;color:var(--tx2)">Todavía no hay ninguna ubicación guardada.</div>';return;}
-  cont.innerHTML=claves.map(function(k){
+  var ids=Object.keys(lugares);
+  if(!ids.length){cont.innerHTML='<div style="font-size:12px;color:var(--tx2)">Todavía no hay ninguna ubicación guardada.</div>';return;}
+  cont.innerHTML=ids.sort(function(a,b){return nombreLugar(lugares[a]).localeCompare(nombreLugar(lugares[b]));}).map(function(k){
     var l=lugares[k],d=miUbicacion?distanciaMetros(miUbicacion,l):null;
-    return '<div class="ocr-field"><span class="ocr-field-lbl">'+l.nombre+(d!=null?' · '+textoDistancia(d):'')+'</span>'
+    return '<div class="ocr-field"><span class="ocr-field-lbl">'+nombreLugar(l)
+      +'<br><span style="font-weight:400;color:var(--tx2);font-size:11px">'+etiquetaTipo(l.tipo)+(d!=null?" · "+textoDistancia(d):"")+'</span></span>'
       +'<span class="ocr-field-val" style="font-weight:400;color:#A32D2D;cursor:pointer" onclick="borrarLugarMob(\''+k+'\')">Borrar</span></div>';
   }).join("");
 }
@@ -1165,7 +1265,7 @@ function renderMapaMob(){
   var puntos=[];
   Object.keys(lugares).forEach(function(k){
     var l=lugares[k];
-    L.marker([l.lat,l.lng]).bindPopup("<b>"+l.nombre+"</b>").addTo(capaMapaMob);
+    L.marker([l.lat,l.lng]).bindPopup("<b>"+nombreLugar(l)+"</b><br>"+etiquetaTipo(l.tipo)).addTo(capaMapaMob);
     puntos.push([l.lat,l.lng]);
   });
   if(miUbicacion){
@@ -1178,13 +1278,13 @@ function renderMapaMob(){
     else if(puntos.length>1)mapaMob.fitBounds(puntos,{padding:[30,30]});
   },120);
 }
-// Distancia al banco de la tarea, para mostrar al lado del nombre.
+// Distancia a la sucursal que le sirve a esa tarea.
 function chipDistanciaMob(t){
   var d=distanciaDeTarea(t);
   if(d==null)return "";
   return '<span class="tag" style="background:var(--gl);color:var(--green)">📍 '+textoDistancia(d)+'</span>';
 }
-// "Lo más cerca ahora": la tarea pendiente cuyo banco está más próximo.
+// "Lo más cerca ahora": la tarea pendiente cuya sucursal está más próxima.
 function renderSugerenciaMob(pendientes){
   var box=document.getElementById("mob-sugerencia");if(!box)return;
   if(!miUbicacion||!pendientes.length){box.style.display="none";return;}
@@ -1192,8 +1292,63 @@ function renderSugerenciaMob(pendientes){
   if(!orden.length){box.style.display="none";return;}
   var p=orden[0];
   box.style.display="block";
-  box.innerHTML="<b>📍 Empezá por "+p.t.banco+"</b> — "+textoDistancia(p.d)+" (unos "+minutosAPie(p.d)+" min a pie)"
-    +(orden.length>1?'<div style="color:var(--tx2);margin-top:3px">Después: '+orden.slice(1,4).map(function(x){return x.t.banco+" ("+textoDistancia(x.d)+")";}).join(" · ")+"</div>":"");
+  box.innerHTML="<b>📍 Empezá por "+nombreLugar(p.lugar)+"</b> — "+textoDistancia(p.d)+" (unos "+minutosAPie(p.d)+" min a pie)"
+    +(orden.length>1?'<div style="color:var(--tx2);margin-top:3px">Después: '+orden.slice(1,4).map(function(x){return nombreLugar(x.lugar)+" ("+textoDistancia(x.d)+")";}).join(" · ")+"</div>":"");
+}
+// ── Compartir la ubicación mientras se hace una tarea ──
+// Solo se manda la posición cuando hay una tarea EN CURSO (desde "Iniciar"
+// hasta que se termina) y con la app abierta. Al terminar deja de mandarse y
+// se avisa a la PC para que saque el punto del mapa. No se guarda ningún
+// recorrido en ningún lado: es un aviso en vivo que se pisa cada vez.
+let compartirUbic=(function(){try{return localStorage.getItem("ft-mob-compartir")!=="no";}catch(e){return true;}})();
+let timerUbic=null,ultimaTareaEnCurso="";
+function hayTareaEnCurso(){
+  var t=tareas.filter(function(x){return x.st==="en_camino"||x.st==="en_banco";})[0];
+  return t||null;
+}
+function mandarUbicacion(){
+  var t=hayTareaEnCurso();
+  if(!t||!miPerfilMob.nombre)return;
+  pedirMiUbicacion(function(u){
+    if(window.FDSupabase)window.FDSupabase.broadcastEvent({
+      tipo:"ubicacion",nombre:miPerfilMob.nombre,color:miPerfilMob.color,
+      lat:u.lat,lng:u.lng,precision:u.precision,
+      txt:t.txt,fase:t.st==="en_banco"?"en el banco":"en camino"
+    });
+    renderMapaMob();
+  },function(){});
+}
+function avisarQueTermino(){
+  if(miPerfilMob.nombre&&window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"ubicacion_fin",nombre:miPerfilMob.nombre});
+}
+// Se llama cada vez que se redibuja el journal: si hay tarea en curso y está
+// activado, prende el envío; si no, lo apaga.
+function actualizarCompartirUbicacion(){
+  var t=hayTareaEnCurso();
+  var debe=!!(t&&compartirUbic&&miPerfilMob.nombre);
+  if(debe&&!timerUbic){
+    mandarUbicacion();
+    timerUbic=setInterval(mandarUbicacion,45000);
+  }else if(!debe&&timerUbic){
+    clearInterval(timerUbic);timerUbic=null;
+    avisarQueTermino();
+  }else if(debe&&(t.id+"|"+t.st)!==ultimaTareaEnCurso){
+    mandarUbicacion(); // cambió de etapa (llegó al banco) o de tarea
+  }
+  ultimaTareaEnCurso=t?(t.id+"|"+t.st):"";
+  var ind=document.getElementById("mob-compartiendo");
+  if(ind){
+    ind.style.display=debe?"block":"none";
+    if(debe)ind.textContent="📍 La PC está viendo tu ubicación mientras dura esta tarea";
+  }
+  var chk=document.getElementById("mob-compartir-chk");
+  if(chk)chk.checked=compartirUbic;
+}
+function cambiarCompartirUbic(el){
+  compartirUbic=!!el.checked;
+  try{localStorage.setItem("ft-mob-compartir",compartirUbic?"si":"no");}catch(e){}
+  actualizarCompartirUbicacion();
+  toast(compartirUbic?"La PC te verá mientras hacés una tarea":"Ya no se comparte tu ubicación","var(--blue)");
 }
 // ── MODAL TAREA ──
 function setSeg(segId,idx,cls){document.querySelectorAll("#"+segId+" .seg-opt").forEach((b,i)=>b.className="seg-opt"+(i===idx?" "+cls:""));}
@@ -2126,6 +2281,13 @@ document.getElementById("modal-acuse-mob").addEventListener("click",function(e){
 fillBancosMob();
 renderTareasGen();
 renderPerfilMob();
+// Ubicación al abrir, solo si el permiso YA estaba dado (no pregunta nada):
+// así las distancias y la sugerencia aparecen sin tener que ir al mapa.
+if(navigator.permissions&&navigator.permissions.query){
+  navigator.permissions.query({name:"geolocation"}).then(function(p){
+    if(p.state==="granted")pedirMiUbicacion(function(){renderJournal();},function(){});
+  }).catch(function(){});
+}
 renderJournal();
 renderOficinaMob();
 renderCuentas();
@@ -2322,7 +2484,7 @@ function applyRemoteChangeMob(key,value){
   else if(key==="fd-desc"){descuentos=value;nD=descuentos.length?Math.max(0,...descuentos.map(d=>d.id))+1:1;if(document.getElementById("desc-lista"))renderDescuentosList();}
   else if(key==="fd-depo"){depositos=value;nDp=depositos.length?Math.max(0,...depositos.map(d=>d.id))+1:1;if(document.getElementById("depo-lista"))renderDepositosList();}
   else if(key==="fd-notas"){notasJ=value;}
-  else if(key==="fd-lugares"){lugares=(value&&typeof value==="object")?value:{};try{localStorage.setItem("ft-mob-lugares",JSON.stringify(lugares));}catch(e){}renderLugaresMob();renderMapaMob();return;}
+  else if(key==="fd-lugares"){lugares=(value&&typeof value==="object")?value:{};migrarLugares();try{localStorage.setItem("ft-mob-lugares",JSON.stringify(lugares));}catch(e){}renderSelLugaresMob();renderLugaresMob();renderMapaMob();renderJournal();return;}
   else if(key==="fd-perfiles"){perfilesEquipo=Array.isArray(value)?value:[];try{localStorage.setItem("ft-mob-perfiles",JSON.stringify(perfilesEquipo));}catch(e){}renderPerfilMob();return;}
   else if(key==="fd-tareasgen"){tareasGen=Array.isArray(value)?value:[];try{localStorage.setItem("ft-mob-tareasgen",JSON.stringify(tareasGen));}catch(e){}renderTareasGen();return;}
   else if(key==="fd-oficina"){oficina=Object.assign({activo:false,lugar:"",inicio:null,hist:[]},value);oficinaAnchor=null;renderOficinaMob();}
@@ -2395,7 +2557,7 @@ async function ftResyncMob(){
   if(remote["fd-desc"]!=null){descuentos=remote["fd-desc"];hubo=true;}
   if(remote["fd-depo"]!=null){depositos=remote["fd-depo"];hubo=true;}
   if(remote["fd-notas"]!=null&&remote["fd-notas"]!==""){notasJ=remote["fd-notas"];hubo=true;}
-  if(remote["fd-lugares"]&&typeof remote["fd-lugares"]==="object"){lugares=remote["fd-lugares"];try{localStorage.setItem("ft-mob-lugares",JSON.stringify(lugares));}catch(e){}renderLugaresMob();}
+  if(remote["fd-lugares"]&&typeof remote["fd-lugares"]==="object"){lugares=remote["fd-lugares"];migrarLugares();try{localStorage.setItem("ft-mob-lugares",JSON.stringify(lugares));}catch(e){}renderSelLugaresMob();renderLugaresMob();renderMapaMob();renderJournal();}
   if(Array.isArray(remote["fd-perfiles"])){perfilesEquipo=remote["fd-perfiles"];try{localStorage.setItem("ft-mob-perfiles",JSON.stringify(perfilesEquipo));}catch(e){}renderPerfilMob();}
   if(Array.isArray(remote["fd-tareasgen"])){tareasGen=remote["fd-tareasgen"];try{localStorage.setItem("ft-mob-tareasgen",JSON.stringify(tareasGen));}catch(e){}renderTareasGen();}
   if(remote["fd-oficina"]!=null){oficina=Object.assign({activo:false,lugar:"",inicio:null,hist:[]},remote["fd-oficina"]);oficinaAnchor=null;hubo=true;}
