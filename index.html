@@ -137,7 +137,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
     <svg width="26" height="26" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#F5C200"/><circle cx="145" cy="330" r="90" fill="#1a1a1a"/><circle cx="145" cy="330" r="50" fill="#eee"/><circle cx="145" cy="330" r="22" fill="#1a1a1a"/><circle cx="355" cy="345" r="55" fill="#1a1a1a"/><circle cx="355" cy="345" r="28" fill="#eee"/><rect x="110" y="180" width="290" height="120" rx="18" fill="#1a1a1a"/><rect x="270" y="110" width="130" height="100" rx="18" fill="#1a1a1a"/><rect x="278" y="118" width="114" height="76" rx="10" fill="#a8d8f0" opacity=".85"/></svg>
     Finanzas Tracto
     <!-- Versión visible. Tiene que coincidir en la PC, en el celular y en el CACHE de sw.js del celular: si alguno dice otro número, ese equipo no tiene la última versión. Se sube junto con cada cambio. -->
-    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v58</span>
+    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v72</span>
   </div>
   <button class="emp-switch" onclick="toggleEmp()" id="emp-btn">Tracto</button>
 </div>
@@ -297,7 +297,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
 <div id="page-ctas" class="page">
   <div style="display:flex;gap:6px;margin-bottom:12px">
     <button class="seg-opt on" id="cta-btn-t" onclick="setCuentasTab('tracto')" style="flex:1;border-radius:10px;padding:10px;border:1.5px solid var(--bd)">🚜 Tracto</button>
-    <button class="seg-opt" id="cta-btn-a" onclick="setCuentasTab('agri')" style="flex:1;border-radius:10px;padding:10px;border:1.5px solid var(--bd)">🌱 Agricultural</button>
+    <button class="seg-opt" id="cta-btn-a" onclick="setCuentasTab('agri')" style="flex:1;border-radius:10px;padding:10px;border:1.5px solid var(--bd)">🌱 Agricultural Business S.R.L.</button>
   </div>
   <div id="mob-ctas-lista"></div>
 </div>
@@ -310,16 +310,13 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
     <div style="font-size:11px;color:var(--tx2);margin-bottom:8px">Parado en la puerta del banco, elegilo de la lista y guardá. Queda cargado para todo el equipo.</div>
     <select class="fi" id="mob-lugar-sel" style="margin-bottom:8px"></select>
     <input class="fi" id="mob-lugar-suc" placeholder="Sucursal (opcional) — ej: Centro" style="margin-bottom:8px">
-    <select class="fi" id="mob-lugar-tipo" style="margin-bottom:8px"></select>
+    <select class="fi" id="mob-lugar-tipo" style="margin-bottom:8px" onchange="tipoOtroMob(this)"></select>
+    <input class="fi" id="mob-lugar-tipo-otro" placeholder="Escribí para qué sirve — ej: Tesorería" style="margin-bottom:8px;display:none">
     <button class="phase-btn" style="width:100%" onclick="guardarLugarAquiMob()">📌 Guardar esta ubicación</button>
   </div>
   <div class="card" style="margin-top:12px">
-    <div class="card-title">Mientras hago una tarea</div>
-    <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
-      <input type="checkbox" id="mob-compartir-chk" onchange="cambiarCompartirUbic(this)" style="width:18px;height:18px">
-      <span>Que la PC vea dónde estoy mientras la tarea está en curso</span>
-    </label>
-    <div style="font-size:11px;color:var(--tx2);margin-top:6px">Se comparte solo desde que tocás «Iniciar» hasta que terminás la tarea, y solo con la app abierta. No se guarda ningún recorrido.</div>
+    <div class="card-title">Ubicación</div>
+    <div style="font-size:11px;color:var(--tx2)">Mientras la app está abierta, la oficina ve en su mapa dónde estás, para coordinar los trámites del día. No se guarda ningún recorrido.</div>
   </div>
   <div class="card" style="margin-top:12px">
     <div class="card-title">Lugares guardados</div>
@@ -380,27 +377,6 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
       <div class="fgrp"><span class="flabel">Tarea</span>
         <div style="position:relative;margin-bottom:4px"><i class="ti ti-search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--tx2);pointer-events:none"></i><input class="fi" id="mt-gen-buscar-mob" placeholder="Buscar tarea…" autocomplete="off" oninput="buscarTareaGenMob()" style="padding-left:30px"></div><div id="mt-gen-buscar-aviso-mob" style="display:none;font-size:12px;margin-bottom:4px"></div>
         <select class="fi" id="mt-gen-tarea-mob" onchange="setGenTareaMob()">
-          <optgroup label="Otros">
-            <option value="otro">Otra tarea (escribir a mano)</option>
-          </optgroup>
-          <optgroup label="Retiros">
-            <option value="pagare">Retiro de pagaré</option>
-            <option value="rechazado" data-busca="devuelto">Retiro de cheque rechazado</option>
-            <option value="chequera" data-busca="talonario">Retiro de chequera</option>
-          </optgroup>
-          <optgroup label="Entregas">
-            <option value="solicitud" data-busca="prestamo retencion">Entrega de solicitud</option>
-            <option value="ddjj" data-busca="ddjj">Entrega de declaración jurada</option>
-            <option value="recibo">Entrega de recibo de dinero</option>
-          </optgroup>
-          <optgroup label="Pagos">
-            <option value="ande" data-busca="luz electricidad">Pago de factura ANDE</option>
-            <option value="copaco" data-busca="telefono internet linea">Pago de factura COPACO</option>
-          </optgroup>
-          <optgroup label="Operaciones bancarias">
-            <option value="descuento">Descuento de cheques</option>
-            <option value="cartera">Operación de compra de cartera</option>
-          </optgroup>
         </select>
         <div style="display:flex;gap:6px;margin-top:4px">
           <button class="phase-btn" type="button" style="flex:1" onclick="agregarTareaGenMob()">➕ Agregar a la lista</button>
@@ -714,6 +690,11 @@ function renderJournal(){
       const isDone=t.st==="done";
       const isEC=t.st==="en_camino";
       const isEB=t.st==="en_banco";
+      // De qué empresa es la tarea. Las tareas viejas que no lo tienen guardado
+      // no muestran nada: mejor vacío que una etiqueta equivocada.
+      const empTag=(t.emp==="tracto"||t.emp==="agri")
+        ? `<span class="tag" style="background:${t.emp==="tracto"?"#E6F1FB":"#EAF3DE"};color:${t.emp==="tracto"?"#185FA5":"#1D9E75"};font-weight:700">${t.emp==="tracto"?"Tracto":"Agrisa"}</span>`
+        : "";
       const tipoTag=t.tipo==="deposito"?`<span class="tag tag-dep">Depósito</span>`:t.tipo==="retiro"?`<span class="tag tag-ret">Retiro</span>`:`<span class="tag tag-gen">General</span>`;
       const monTag=t.mon?`<span class="tag ${t.mon==="USD"?"tag-usd":"tag-gs"}">${t.mon}</span>`:"";
       const bancoTag=t.banco?`<span class="tag" style="background:var(--bg);color:var(--tx2)">🏦 ${t.banco}</span>`:"";
@@ -764,7 +745,7 @@ function renderJournal(){
         <div class="task-check ${isDone&&!noCum?"done":""}" style="${noCum?"background:var(--al);border-color:var(--amber)":""}" onclick="mobCycle(${t.id})">${isDone?`<i class="ti ${noCum?"ti-alert-triangle":"ti-check"}" style="font-size:12px;${noCum?"color:var(--amber)":""}"></i>`:""}</div>
         <div class="task-body">
           <div class="task-txt ${isDone&&!noCum?"done":""}">${t.txt}${noCumTag}</div>
-          <div class="task-meta">${tipoTag}${monTag}${bancoTag}${nomTag}${montoTag}${chipDistanciaMob(t)}</div>${htmlChequesTareaMob(t)}
+          <div class="task-meta">${empTag}${tipoTag}${monTag}${bancoTag}${nomTag}${montoTag}${chipDistanciaMob(t)}</div>${htmlChequesTareaMob(t)}
           ${phaseBtns}${noCumBtn}${cronoHtml}${motivoHtml}${obsHtml}${acuseBtnHtml}
         </div>
         <button onclick="mobDelT(${t.id})" style="border:none;background:none;color:var(--tx3);font-size:18px;padding:4px;cursor:pointer"><i class="ti ti-trash"></i></button>
@@ -803,6 +784,19 @@ function renderJournal(){
 // t.cronoFase), que se sincroniza vía Supabase. Así, si se inicia desde el
 // celular, la PC (y cualquier otro celular) también ve el reloj corriendo,
 // y viceversa — no importa qué dispositivo lo arrancó.
+// Google Maps con el camino hasta el destino de la tarea. Se usa el enlace
+// normal de indicaciones: en el celular lo toma la app de Maps y arranca
+// directamente la ruta desde donde estás.
+function linkCamino(t){
+  var l=(typeof lugarParaTarea==="function")?lugarParaTarea(t):null;
+  return l?("https://www.google.com/maps/dir/?api=1&destination="+l.lat+","+l.lng+"&travelmode=driving"):"";
+}
+function abrirCamino(t){
+  var url=linkCamino(t);
+  if(!url)return false;
+  window.open(url,"_blank");
+  return true;
+}
 function mobIniciar(id){
   const t=tareas.find(t=>t.id===id);if(!t)return;
   limpiarAnclas(id); // si la tarea se rehace, no arrastrar el ancla de la vuelta anterior
@@ -811,6 +805,8 @@ function mobIniciar(id){
   sv();
   if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"iniciada",nombre:miPerfilMob.nombre,color:miPerfilMob.color,txt:t.txt,taskId:id});
   toast("🚶 En camino...","var(--amber)");renderJournal();
+  // Si el destino ya está en el mapa, se abre el camino en Google Maps.
+  abrirCamino(t);
 }
 function mobBanco(id){
   const t=tareas.find(t=>t.id===id);if(!t)return;
@@ -820,6 +816,20 @@ function mobBanco(id){
   t.st="en_banco";t.bancoMs=0;sv();
   if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"banco",nombre:miPerfilMob.nombre,color:miPerfilMob.color,txt:t.txt,taskId:id,tCalle:fmtT(t.calleMs)});
   toast("🏦 Llegaste al banco","var(--blue)");renderJournal();
+  ofrecerGuardarLugarDeTarea(t);
+}
+// Al llegar a un destino que todavía no está en el mapa, se ofrece guardarlo
+// con el nombre de la tarea. Así la próxima vez que se repita el trámite, la
+// app ya sabe a qué distancia queda y lo ordena con las demás.
+function ofrecerGuardarLugarDeTarea(t){
+  var destino=destinoDeTarea(t);
+  if(!destino||lugarParaTarea(t))return;
+  pedirMiUbicacion(function(u){
+    if(!confirm('¿Guardás este lugar como «'+destino+'»?\n\nLa próxima vez la app ya te va a decir a qué distancia queda.'))return;
+    lugares[idLugar(destino,"")]={banco:destino,sucursal:"",tipo:"ambos",lat:u.lat,lng:u.lng,precision:u.precision,ts:Date.now(),por:miPerfilMob.nombre||""};
+    guardarLugares();renderSelLugaresMob();renderLugaresMob();renderMapaMob();renderJournal();
+    toast("📌 "+destino+" guardado en el mapa","var(--green)");
+  },function(){});
 }
 // ── Resultado de una tarea cerrada ──
 // CUMPLIDA (se hizo el trámite) o NO CUMPLIDA (se fue, pero no se pudo: el
@@ -1110,6 +1120,20 @@ function minutosAPie(m){return m==null?null:Math.max(1,Math.round(m/80));}
 // depósitos; para las tareas generales (pagarés, solicitudes, chequeras), la de
 // los oficiales de cuenta. Entre las que sirven, la más cercana. Si ninguna
 // coincide con el tipo, se usa cualquiera del banco antes que no decir nada.
+// A qué lugar va una tarea. Para depósitos y retiros es el banco; para las
+// tareas generales puede ser un lugar que no es banco: a quién se le entrega
+// el recibo, o el nombre de una tarea propia ("Entregar factura al jefe").
+// Lo que devuelve esta función es el nombre con el que se guarda el lugar.
+function destinoDeTarea(t){
+  if(!t)return "";
+  if(t.banco)return t.banco;
+  if(t.genDestino)return t.genDestino;
+  if(t.genTarea&&t.genTarea.indexOf("propia:")===0){
+    var obj=(typeof tareasGen!=="undefined")?tareasGen.filter(function(x){return "propia:"+x.id===t.genTarea;})[0]:null;
+    if(obj)return obj.lugar||obj.txt;
+  }
+  return String(t.txt||"").split(" — ")[0].trim();
+}
 function tipoQueNecesita(t){
   if(!t)return "";
   if(t.tipo==="deposito"||t.tipo==="retiro")return "deposito";
@@ -1117,8 +1141,9 @@ function tipoQueNecesita(t){
   return "";
 }
 function lugarParaTarea(t){
-  if(!t||!t.banco)return null;
-  var todos=lugaresDe(t.banco);
+  var destino=destinoDeTarea(t);
+  if(!destino)return null;
+  var todos=lugaresDe(destino);
   if(!todos.length)return null;
   var quiere=tipoQueNecesita(t);
   var sirven=quiere?todos.filter(function(l){return l.tipo==="ambos"||l.tipo===quiere;}):todos.slice();
@@ -1141,11 +1166,29 @@ function tareasPorCercania(lista){
       return a.d-b.d;
     });
 }
+function anotarUbicacion(coords){
+  miUbicacion={lat:coords.latitude,lng:coords.longitude,precision:Math.round(coords.accuracy||0),ts:Date.now()};
+  return miUbicacion;
+}
+// Dentro de la app instalada (APK) el permiso de ubicación lo tiene que pedir
+// Android, y eso solo lo puede hacer el plugin. En el navegador no existe el
+// plugin y se usa el GPS de siempre.
 function pedirMiUbicacion(alTenerla,alFallar){
+  var G=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Geolocation;
+  if(G){
+    G.requestPermissions().then(function(p){
+      if(p&&p.location==="denied"&&p.coarseLocation==="denied")throw new Error("permiso");
+      return G.getCurrentPosition({enableHighAccuracy:true,timeout:15000,maximumAge:30000});
+    }).then(function(pos){
+      if(alTenerla)alTenerla(anotarUbicacion(pos.coords));
+    }).catch(function(e){
+      if(alFallar)alFallar(String(e&&e.message)==="permiso"?"Hay que permitir el acceso a la ubicación en los ajustes del teléfono.":"No se pudo leer el GPS. Probá al aire libre.");
+    });
+    return;
+  }
   if(!navigator.geolocation){if(alFallar)alFallar("Este dispositivo no tiene GPS.");return;}
   navigator.geolocation.getCurrentPosition(function(pos){
-    miUbicacion={lat:pos.coords.latitude,lng:pos.coords.longitude,precision:Math.round(pos.coords.accuracy||0),ts:Date.now()};
-    if(alTenerla)alTenerla(miUbicacion);
+    if(alTenerla)alTenerla(anotarUbicacion(pos.coords));
   },function(err){
     if(alFallar)alFallar(err&&err.code===1?"Hay que permitir el acceso a la ubicación.":"No se pudo leer el GPS. Probá al aire libre.");
   },{enableHighAccuracy:true,timeout:15000,maximumAge:30000});
@@ -1175,6 +1218,20 @@ function tiposDeLugar(){
     if(t&&!vistos[t]){vistos[t]=1;out.push(t);}
   });
   return out;
+}
+// Al elegir "Otro..." aparece el casillero para escribir la especificación.
+function tipoOtroMob(sel){
+  var box=document.getElementById("mob-lugar-tipo-otro");
+  if(!box)return;
+  box.style.display=(sel.value==="__otro__")?"block":"none";
+  if(sel.value==="__otro__")box.focus();
+}
+function tipoElegidoMob(){
+  var sel=document.getElementById("mob-lugar-tipo");
+  var v=sel?sel.value:"ambos";
+  if(v!=="__otro__")return v||"ambos";
+  var otro=document.getElementById("mob-lugar-tipo-otro");
+  return (otro&&otro.value||"").replace(/\s+/g," ").trim();
 }
 function llenarSelectTipo(sel){
   if(!sel)return;
@@ -1222,12 +1279,11 @@ function guardarLugarAquiMob(){
   }
   if(!nombre)return;
   var sucursal=(document.getElementById("mob-lugar-suc").value||"").replace(/\s+/g," ").trim();
-  var tipo=document.getElementById("mob-lugar-tipo").value||"ambos";
-  // Una especificación propia: "Tesorería", "Cambio de cheques", lo que sea.
-  if(tipo==="__otro__"){
-    tipo=(prompt("¿Para qué sirve este lugar?\n\nEj: Tesorería, Cambio de cheques")||"").replace(/\s+/g," ").trim();
-    if(!tipo){llenarSelectTipo(document.getElementById("mob-lugar-tipo"));return;}
-  }
+  var tipo=tipoElegidoMob();
+  if(!tipo){toast("Escribí para qué sirve este lugar","#A32D2D");return;}
+  // Si ya hay una sucursal de ese banco y no le pusieron nombre a esta, se
+  // numera sola ("Sucursal 2") en vez de pisar la que ya estaba.
+  if(!sucursal&&lugaresDe(nombre).length)sucursal="Sucursal "+(lugaresDe(nombre).length+1);
   var id=idLugar(nombre,sucursal);
   if(lugares[id]&&!confirm("«"+nombre+(sucursal?" — "+sucursal:"")+"» ya está guardado.\n\n¿Lo reemplazás por donde estás ahora?"))return;
   lugares[id]={banco:nombre,sucursal:sucursal,tipo:tipo,lat:miUbicacion.lat,lng:miUbicacion.lng,precision:miUbicacion.precision,ts:Date.now(),por:miPerfilMob.nombre||""};
@@ -1292,71 +1348,84 @@ function renderSugerenciaMob(pendientes){
   if(!orden.length){box.style.display="none";return;}
   var p=orden[0];
   box.style.display="block";
-  box.innerHTML="<b>📍 Empezá por "+nombreLugar(p.lugar)+"</b> — "+textoDistancia(p.d)+" (unos "+minutosAPie(p.d)+" min a pie)"
+  // Una tarea general se hace con los oficiales de cuenta: si de ese banco
+  // solo está cargada la sucursal de depósitos, conviene decirlo.
+  var necesita=tipoQueNecesita(p.t),sirve=p.lugar&&(p.lugar.tipo==="ambos"||p.lugar.tipo===necesita);
+  var aviso=(necesita&&!sirve)?('<div style="color:var(--amber);margin-top:3px">Ojo: de '+(p.t.banco||"")+" solo está cargada "+etiquetaTipo(p.lugar.tipo).toLowerCase()+". Si vas con los oficiales, guardá esa sucursal cuando llegues.</div>"):"";
+  box.innerHTML="<b>📍 Empezá por "+nombreLugar(p.lugar)+"</b> — "+textoDistancia(p.d)+" (unos "+minutosAPie(p.d)+" min a pie)"+aviso
     +(orden.length>1?'<div style="color:var(--tx2);margin-top:3px">Después: '+orden.slice(1,4).map(function(x){return nombreLugar(x.lugar)+" ("+textoDistancia(x.d)+")";}).join(" · ")+"</div>":"");
 }
-// ── Compartir la ubicación mientras se hace una tarea ──
-// Solo se manda la posición cuando hay una tarea EN CURSO (desde "Iniciar"
-// hasta que se termina) y con la app abierta. Al terminar deja de mandarse y
-// se avisa a la PC para que saque el punto del mapa. No se guarda ningún
-// recorrido en ningún lado: es un aviso en vivo que se pisa cada vez.
-let compartirUbic=(function(){try{return localStorage.getItem("ft-mob-compartir")!=="no";}catch(e){return true;}})();
-let timerUbic=null,ultimaTareaEnCurso="";
+// ── Compartir la ubicación con la oficina ──
+// Desde que se abre la app, este celular manda su posición cada 45 segundos
+// para que en la PC se vea dónde anda cada uno. Mientras hay una tarea en
+// curso además se pide mantener la pantalla encendida, así el envío no se
+// corta mientras se camina.
+// OJO con lo que NO se puede: si la app se cierra o el teléfono apaga la
+// pantalla un rato largo, el navegador congela la página y deja de mandar.
+// Eso no tiene vuelta en una app web; haría falta una app instalada.
+// No se guarda ningún recorrido: cada aviso pisa al anterior y la PC lo
+// descarta a los 15 minutos.
+let timerUbic=null,ultimaMarcaUbic="",lockPantalla=null;
 function hayTareaEnCurso(){
-  var t=tareas.filter(function(x){return x.st==="en_camino"||x.st==="en_banco";})[0];
-  return t||null;
+  return tareas.filter(function(x){return x.st==="en_camino"||x.st==="en_banco";})[0]||null;
 }
 function mandarUbicacion(){
+  if(!miPerfilMob.nombre)return;
   var t=hayTareaEnCurso();
-  if(!t||!miPerfilMob.nombre)return;
   pedirMiUbicacion(function(u){
     if(window.FDSupabase)window.FDSupabase.broadcastEvent({
       tipo:"ubicacion",nombre:miPerfilMob.nombre,color:miPerfilMob.color,
       lat:u.lat,lng:u.lng,precision:u.precision,
-      txt:t.txt,fase:t.st==="en_banco"?"en el banco":"en camino"
+      txt:t?t.txt:"",banco:t?(t.banco||""):"",tipoTarea:t?(t.tipo||""):"",
+      fase:t?(t.st==="en_banco"?"en el banco":"en camino"):"con la app abierta"
     });
     renderMapaMob();
   },function(){});
 }
-function avisarQueTermino(){
-  if(miPerfilMob.nombre&&window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"ubicacion_fin",nombre:miPerfilMob.nombre});
+// Mantiene la pantalla encendida mientras dura la tarea, para que el envío no
+// se corte. Si el teléfono no lo permite, sigue andando igual.
+async function cuidarPantalla(debe){
+  try{
+    if(debe&&!lockPantalla&&navigator.wakeLock){
+      lockPantalla=await navigator.wakeLock.request("screen");
+      lockPantalla.addEventListener("release",function(){lockPantalla=null;});
+    }else if(!debe&&lockPantalla){
+      await lockPantalla.release();lockPantalla=null;
+    }
+  }catch(e){lockPantalla=null;}
 }
-// Se llama cada vez que se redibuja el journal: si hay tarea en curso y está
-// activado, prende el envío; si no, lo apaga.
 function actualizarCompartirUbicacion(){
-  var t=hayTareaEnCurso();
-  var debe=!!(t&&compartirUbic&&miPerfilMob.nombre);
+  var debe=!!miPerfilMob.nombre;
   if(debe&&!timerUbic){
     mandarUbicacion();
     timerUbic=setInterval(mandarUbicacion,45000);
   }else if(!debe&&timerUbic){
     clearInterval(timerUbic);timerUbic=null;
-    avisarQueTermino();
-  }else if(debe&&(t.id+"|"+t.st)!==ultimaTareaEnCurso){
-    mandarUbicacion(); // cambió de etapa (llegó al banco) o de tarea
+    if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"ubicacion_fin",nombre:ultimaMarcaUbic.split("|")[0]||""});
   }
-  ultimaTareaEnCurso=t?(t.id+"|"+t.st):"";
+  var t=hayTareaEnCurso();
+  var marca=(miPerfilMob.nombre||"")+"|"+(t?(t.id+"|"+t.st):"");
+  if(debe&&marca!==ultimaMarcaUbic&&timerUbic)mandarUbicacion(); // cambió de etapa o de tarea
+  ultimaMarcaUbic=marca;
+  cuidarPantalla(!!t);
   var ind=document.getElementById("mob-compartiendo");
   if(ind){
     ind.style.display=debe?"block":"none";
-    if(debe)ind.textContent="📍 La PC está viendo tu ubicación mientras dura esta tarea";
+    ind.textContent=t?"📍 La oficina ve tu ubicación (tarea en curso)":"📍 La oficina ve tu ubicación mientras la app está abierta";
   }
-  var chk=document.getElementById("mob-compartir-chk");
-  if(chk)chk.checked=compartirUbic;
 }
-function cambiarCompartirUbic(el){
-  compartirUbic=!!el.checked;
-  try{localStorage.setItem("ft-mob-compartir",compartirUbic?"si":"no");}catch(e){}
-  actualizarCompartirUbicacion();
-  toast(compartirUbic?"La PC te verá mientras hacés una tarea":"Ya no se comparte tu ubicación","var(--blue)");
-}
+// Al volver a la app se manda la posición enseguida: mientras estuvo tapada o
+// con la pantalla apagada, el teléfono no la deja mandar.
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState==="visible")actualizarCompartirUbicacion();
+});
 // ── MODAL TAREA ──
 function setSeg(segId,idx,cls){document.querySelectorAll("#"+segId+" .seg-opt").forEach((b,i)=>b.className="seg-opt"+(i===idx?" "+cls:""));}
 function openModalTarea(){
   mtTipo="deposito";mtMon="GS";mtInst="efectivo";mtCanal="ventanilla";mtPri="alta";
   ["mt-txt-mob","mt-obs-mob","mt-monto-mob","mt-nom-mob","mt-gen-solic-otro-mob","mt-gen-destino-mob","mt-gen-importe-mob"].forEach(id=>{const e=document.getElementById(id);if(e)e.value="";});
   reiniciarFilasGenMob();
-  document.getElementById("mt-gen-tarea-mob").value="pagare";limpiarBusquedaGenMob();document.getElementById("mt-gen-solic-mob").value="Préstamo";setGenTareaMob();
+  const selGenMob=document.getElementById("mt-gen-tarea-mob");if(selGenMob)selGenMob.selectedIndex=selGenMob.options.length?0:-1;limpiarBusquedaGenMob();document.getElementById("mt-gen-solic-mob").value="Préstamo";setGenTareaMob();
   setSeg("mseg-tipo",1,"on-g");setSeg("mseg-pri",0,"on-r");setSeg("mseg-mon",0,"on");setSeg("mseg-inst",0,"on");setSeg("mseg-canal",0,"on");
   document.getElementById("mt-op-mob").style.display="block";
   document.getElementById("mt-cta-mob").style.display="none";
@@ -1430,15 +1499,15 @@ function setGenTareaMob(){
   const solic=document.getElementById("mt-gen-solic-mob").value;
   const ver=(id,cond)=>{const e=document.getElementById(id);if(e)e.style.display=cond?"block":"none";};
   ver("mt-gen-mob",esGen);
-  ver("mt-gen-dueno-box-mob",g==="pagare");
+  ver("mt-gen-dueno-box-mob",pideDuenoMob(g));
   ver("mt-gen-imp-box-mob",g==="rechazado");
   ver("mt-gen-solic-box-mob",g==="solicitud");
   ver("mt-gen-solic-otro-box-mob",g==="solicitud"&&solic==="otro");
   ver("mt-gen-destino-box-mob",g==="recibo");
-  ver("mt-gen-importe-box-mob",TAREAS_CON_IMPORTE.indexOf(g)>=0);
+  ver("mt-gen-importe-box-mob",TAREAS_CON_IMPORTE.indexOf(g)>=0||pideImporteMob(g));
   // La descripción a mano quedó solo para "Otros": en todo lo demás —incluidos
   // depósitos y retiros— el texto se arma solo con los datos cargados.
-  ver("mt-txt-box-mob",esGen&&g==="otro");
+  ver("mt-txt-box-mob",esGen&&(g==="otro"||!g));
   const btnQuitar=document.getElementById("mt-gen-quitar-mob");
   if(btnQuitar)btnQuitar.style.display=(esGen&&g.indexOf("propia:")===0)?"block":"none";
   actualizarVistaPreviaMob();
@@ -1532,10 +1601,6 @@ var TAREAS_CON_IMPORTE=["ande","copaco","descuento","cartera"];
 // celular y se comparten con la PC por la nube ("fd-tareasgen"), así los dos
 // ven la misma lista. Aparecen en el grupo "Mis tareas", arriba de todo.
 let tareasGen=(()=>{try{return JSON.parse(localStorage.getItem("ft-mob-tareasgen")||"[]")||[];}catch(e){return [];}})();
-function guardarTareasGen(){
-  try{localStorage.setItem("ft-mob-tareasgen",JSON.stringify(tareasGen));}catch(e){}
-  if(window.FDSupabase&&window.FDSupabase.estaListoParaEscribir())window.FDSupabase.saveKey("fd-tareasgen",tareasGen);
-}
 function renderTareasGen(){
   const sel=document.getElementById("mt-gen-tarea-mob");if(!sel)return;
   let g=sel.querySelector("optgroup[data-propias]");
@@ -1546,7 +1611,7 @@ function renderTareasGen(){
   }
   const elegido=sel.value;
   g.innerHTML="";
-  tareasGen.forEach(t=>{const o=document.createElement("option");o.value="propia:"+t.id;o.textContent=t.txt;g.appendChild(o);});
+  tareasGen.forEach(t=>{const o=document.createElement("option");o.value="propia:"+t.id;o.textContent=t.txt+(t.lugar?" ("+t.lugar+")":"");g.appendChild(o);});
   if(elegido)sel.value=elegido;
 }
 function tareaPropiaDe(valor){
@@ -1558,7 +1623,10 @@ function agregarTareaGenMob(){
   if(!txt)return;
   if(tareasGen.some(t=>t.txt.toLowerCase()===txt.toLowerCase())){toast("Esa tarea ya está en la lista","#A32D2D");return;}
   const id=Date.now();
-  tareasGen.push({id,txt});
+  // Qué datos pide esta tarea cuando se usa (igual que en la PC).
+  const pideImporte=confirm('¿"'+txt+'" pide un importe?\n\nPor ejemplo, al retirar cheques u otros documentos.');
+  const pideDueno=confirm('¿"'+txt+'" pide el dueño?\n\nPor ejemplo, al retirar pagarés.');
+  tareasGen.push({id,txt,pideImporte,pideDueno});
   guardarTareasGen();renderTareasGen();
   document.getElementById("mt-gen-tarea-mob").value="propia:"+id;
   setGenTareaMob();
@@ -1579,10 +1647,25 @@ function monedaChequesRechMob(){
   const e=document.getElementById("mt-gen-imp-mon-mob");
   return (e&&e.value==="USD")?"USD":"";
 }
+// Qué datos pide una tarea propia.
+function tareaPropiaObjMob(valor){
+  return (valor&&valor.indexOf("propia:")===0)?(tareasGen.filter(x=>"propia:"+x.id===valor)[0]||null):null;
+}
+function pideImporteMob(valor){const o=tareaPropiaObjMob(valor);return !!(o&&o.pideImporte);}
+function pideDuenoMob(valor){const o=tareaPropiaObjMob(valor);return valor==="pagare"||!!(o&&o.pideDueno);}
 function textoGenTareaMob(banco){
   const g=document.getElementById("mt-gen-tarea-mob").value;
-  if(g==="otro")return document.getElementById("mt-txt-mob").value.trim();
-  if(g.indexOf("propia:")===0){const tp=tareaPropiaDe(g);return tp?(tp+(banco?" — "+banco:"")):"";}
+  if(g==="otro"||!g)return document.getElementById("mt-txt-mob").value.trim();
+  if(g.indexOf("propia:")===0){
+    const obj=tareaPropiaObjMob(g);
+    if(!obj)return "";
+    const duenosP=obj.pideDueno?valoresGenMob("dueno").filter(Boolean):[];
+    const impP=obj.pideImporte?(parseFloat(document.getElementById("mt-gen-importe-mob").value)||0):0;
+    return obj.txt
+      +(duenosP.length?" de "+listaEnTextoMob(duenosP):"")
+      +(banco?" — "+banco:"")
+      +(impP>0?" · "+fM(impP,""):"");
+  }
   if(g==="pagare"){
     const duenos=valoresGenMob("dueno"),conNombre=duenos.filter(Boolean),n=Math.max(1,duenos.length);
     return (n>1?"Retiro de "+n+" pagarés":"Retiro de pagaré")
@@ -1660,9 +1743,9 @@ function guardarTareaMob(){
   if(mtTipo!=="general"&&!bp[0]){toast("Elegí el banco","#A32D2D");return;}
   if(mtTipo!=="general"&&!(monto>0)){toast("Ingresá el monto","#A32D2D");return;}
   tareas.push({id:nuevoIdTarea(),txt,genTarea:genTarea,
-    genDueno:genTarea==="pagare"?(valoresGenMob("dueno").filter(Boolean)[0]||""):"",
-    genDuenos:genTarea==="pagare"?valoresGenMob("dueno").filter(Boolean):[],
-    genImporte:genTarea==="rechazado"?valoresGenMob("cheque").reduce((a,v)=>a+(parseFloat(v)||0),0):(TAREAS_CON_IMPORTE.indexOf(genTarea)>=0?(parseFloat(document.getElementById("mt-gen-importe-mob").value)||0):0),
+    genDueno:pideDuenoMob(genTarea)?(valoresGenMob("dueno").filter(Boolean)[0]||""):"",
+    genDuenos:pideDuenoMob(genTarea)?valoresGenMob("dueno").filter(Boolean):[],
+    genImporte:genTarea==="rechazado"?valoresGenMob("cheque").reduce((a,v)=>a+(parseFloat(v)||0),0):((TAREAS_CON_IMPORTE.indexOf(genTarea)>=0||pideImporteMob(genTarea))?(parseFloat(document.getElementById("mt-gen-importe-mob").value)||0):0),
     genDestino:genTarea==="recibo"?document.getElementById("mt-gen-destino-mob").value.trim():"",
     genImportes:genTarea==="rechazado"?valoresGenMob("cheque").map(v=>parseFloat(v)||0).filter(v=>v>0):[],
     genMon:genTarea==="rechazado"?(monedaChequesRechMob()==="USD"?"USD":"GS"):"",
@@ -2182,7 +2265,7 @@ function mobGuardarCheque(){
   const mon=document.getElementById("dep-moneda").value||"GS";
   const monto=importeANumero(document.getElementById("dep-importe").value);
   if(monto<=0){toast("Completá el importe antes de guardar","#A32D2D");return;}
-  const empDet=ocrParsed.empDetectada||(confirm('No pude detectar si este cheque es para "Tracto Agro Vial" o "Agricultural Business".\n\nAceptar = Tracto Agro Vial\nCancelar = Agricultural Business')?"tracto":"agri");
+  const empDet=ocrParsed.empDetectada||(confirm('No pude detectar si este cheque es para "Tracto Agro Vial" o "Agricultural Business".\n\nAceptar = Tracto Agro Vial\nCancelar = Agricultural Business S.R.L.')?"tracto":"agri");
   // Se guarda en "ops" (resumen del día, como antes) Y en la pila de
   // depositos (para que se vea en la PC, en Escáner → Lote de cheques,
   // igual que ya pasa con los descuentos).
@@ -2283,7 +2366,9 @@ renderTareasGen();
 renderPerfilMob();
 // Ubicación al abrir, solo si el permiso YA estaba dado (no pregunta nada):
 // así las distancias y la sugerencia aparecen sin tener que ir al mapa.
-if(navigator.permissions&&navigator.permissions.query){
+if(window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Geolocation){
+  pedirMiUbicacion(function(){renderJournal();},function(){});
+}else if(navigator.permissions&&navigator.permissions.query){
   navigator.permissions.query({name:"geolocation"}).then(function(p){
     if(p.state==="granted")pedirMiUbicacion(function(){renderJournal();},function(){});
   }).catch(function(){});
