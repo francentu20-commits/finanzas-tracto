@@ -137,7 +137,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
     <svg width="26" height="26" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#F5C200"/><circle cx="145" cy="330" r="90" fill="#1a1a1a"/><circle cx="145" cy="330" r="50" fill="#eee"/><circle cx="145" cy="330" r="22" fill="#1a1a1a"/><circle cx="355" cy="345" r="55" fill="#1a1a1a"/><circle cx="355" cy="345" r="28" fill="#eee"/><rect x="110" y="180" width="290" height="120" rx="18" fill="#1a1a1a"/><rect x="270" y="110" width="130" height="100" rx="18" fill="#1a1a1a"/><rect x="278" y="118" width="114" height="76" rx="10" fill="#a8d8f0" opacity=".85"/></svg>
     Finanzas Tracto
     <!-- Versión visible. Tiene que coincidir en la PC, en el celular y en el CACHE de sw.js del celular: si alguno dice otro número, ese equipo no tiene la última versión. Se sube junto con cada cambio. -->
-    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v72</span>
+    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v73</span>
   </div>
   <button class="emp-switch" onclick="toggleEmp()" id="emp-btn">Tracto</button>
 </div>
@@ -1114,8 +1114,9 @@ function textoDistancia(m){
   if(m<1000)return m+" m";
   return (m/1000).toFixed(1).replace(".",",")+" km";
 }
-// A paso normal se caminan unos 80 metros por minuto.
-function minutosAPie(m){return m==null?null:Math.max(1,Math.round(m/80));}
+// En moto por la ciudad se hacen unos 400 metros por minuto (24 km/h),
+// contando semáforos y tráfico.
+function minutosEnMoto(m){return m==null?null:Math.max(1,Math.round(m/400));}
 // Qué sucursal le sirve a cada tarea: para depósitos y retiros, una que reciba
 // depósitos; para las tareas generales (pagarés, solicitudes, chequeras), la de
 // los oficiales de cuenta. Entre las que sirven, la más cercana. Si ninguna
@@ -1352,7 +1353,7 @@ function renderSugerenciaMob(pendientes){
   // solo está cargada la sucursal de depósitos, conviene decirlo.
   var necesita=tipoQueNecesita(p.t),sirve=p.lugar&&(p.lugar.tipo==="ambos"||p.lugar.tipo===necesita);
   var aviso=(necesita&&!sirve)?('<div style="color:var(--amber);margin-top:3px">Ojo: de '+(p.t.banco||"")+" solo está cargada "+etiquetaTipo(p.lugar.tipo).toLowerCase()+". Si vas con los oficiales, guardá esa sucursal cuando llegues.</div>"):"";
-  box.innerHTML="<b>📍 Empezá por "+nombreLugar(p.lugar)+"</b> — "+textoDistancia(p.d)+" (unos "+minutosAPie(p.d)+" min a pie)"+aviso
+  box.innerHTML="<b>📍 Empezá por "+nombreLugar(p.lugar)+"</b> — "+textoDistancia(p.d)+" (unos "+minutosEnMoto(p.d)+" min en moto)"+aviso
     +(orden.length>1?'<div style="color:var(--tx2);margin-top:3px">Después: '+orden.slice(1,4).map(function(x){return nombreLugar(x.lugar)+" ("+textoDistancia(x.d)+")";}).join(" · ")+"</div>":"");
 }
 // ── Compartir la ubicación con la oficina ──
