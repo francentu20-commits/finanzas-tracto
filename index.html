@@ -121,6 +121,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
 .cta-mon{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
 .cta-gs{background:var(--al);color:var(--amber)}
 .cta-usd{background:var(--bl);color:var(--blue)}
+.cta-ofi{background:var(--gl);color:var(--green)}
 .cta-num{font-size:12px;font-family:monospace;color:var(--tx2)}
 /* ACUSE */
 .acuse-zone{border:2px dashed var(--green);border-radius:var(--r);padding:20px;text-align:center;cursor:pointer;color:var(--green);background:var(--gl)}
@@ -137,7 +138,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
     <svg width="26" height="26" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#F5C200"/><circle cx="145" cy="330" r="90" fill="#1a1a1a"/><circle cx="145" cy="330" r="50" fill="#eee"/><circle cx="145" cy="330" r="22" fill="#1a1a1a"/><circle cx="355" cy="345" r="55" fill="#1a1a1a"/><circle cx="355" cy="345" r="28" fill="#eee"/><rect x="110" y="180" width="290" height="120" rx="18" fill="#1a1a1a"/><rect x="270" y="110" width="130" height="100" rx="18" fill="#1a1a1a"/><rect x="278" y="118" width="114" height="76" rx="10" fill="#a8d8f0" opacity=".85"/></svg>
     Finanzas Tracto
     <!-- Versión visible. Tiene que coincidir en la PC, en el celular y en el CACHE de sw.js del celular: si alguno dice otro número, ese equipo no tiene la última versión. Se sube junto con cada cambio. -->
-    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v73</span>
+    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v77</span>
   </div>
   <button class="emp-switch" onclick="toggleEmp()" id="emp-btn">Tracto</button>
 </div>
@@ -1141,7 +1142,10 @@ function tipoQueNecesita(t){
   if(t.tipo==="general")return "oficiales";
   return "";
 }
-function lugarParaTarea(t){
+// "desde" es el punto desde donde se mira: normalmente uno mismo, pero la PC
+// pasa la posición de quien está en la calle, para elegir la misma sucursal
+// que eligió su celular (si no, la PC agarraba siempre la primera de la lista).
+function lugarParaTarea(t,desde){
   var destino=destinoDeTarea(t);
   if(!destino)return null;
   var todos=lugaresDe(destino);
@@ -1149,8 +1153,9 @@ function lugarParaTarea(t){
   var quiere=tipoQueNecesita(t);
   var sirven=quiere?todos.filter(function(l){return l.tipo==="ambos"||l.tipo===quiere;}):todos.slice();
   if(!sirven.length)sirven=todos.slice();
-  if(!miUbicacion)return sirven[0];
-  return sirven.sort(function(a,b){return distanciaMetros(miUbicacion,a)-distanciaMetros(miUbicacion,b);})[0];
+  var ref=desde||miUbicacion;
+  if(!ref)return sirven[0];
+  return sirven.sort(function(a,b){return distanciaMetros(ref,a)-distanciaMetros(ref,b);})[0];
 }
 function distanciaDeTarea(t){
   var l=lugarParaTarea(t);
@@ -1374,10 +1379,14 @@ function mandarUbicacion(){
   if(!miPerfilMob.nombre)return;
   var t=hayTareaEnCurso();
   pedirMiUbicacion(function(u){
+    // Se avisa también a qué sucursal va, para que la PC marque exactamente
+    // la misma y no otra del mismo banco.
+    var dest=t?lugarParaTarea(t):null;
     if(window.FDSupabase)window.FDSupabase.broadcastEvent({
       tipo:"ubicacion",nombre:miPerfilMob.nombre,color:miPerfilMob.color,
       lat:u.lat,lng:u.lng,precision:u.precision,
       txt:t?t.txt:"",banco:t?(t.banco||""):"",tipoTarea:t?(t.tipo||""):"",
+      destLat:dest?dest.lat:null,destLng:dest?dest.lng:null,destNom:dest?nombreLugar(dest):"",
       fase:t?(t.st==="en_banco"?"en el banco":"en camino"):"con la app abierta"
     });
     renderMapaMob();
@@ -1602,6 +1611,11 @@ var TAREAS_CON_IMPORTE=["ande","copaco","descuento","cartera"];
 // celular y se comparten con la PC por la nube ("fd-tareasgen"), así los dos
 // ven la misma lista. Aparecen en el grupo "Mis tareas", arriba de todo.
 let tareasGen=(()=>{try{return JSON.parse(localStorage.getItem("ft-mob-tareasgen")||"[]")||[];}catch(e){return [];}})();
+// Guarda la lista de tareas propias en el celular y en la nube.
+function guardarTareasGen(){
+  try{localStorage.setItem("ft-mob-tareasgen",JSON.stringify(tareasGen));}catch(e){}
+  if(window.FDSupabase&&window.FDSupabase.estaListoParaEscribir())window.FDSupabase.saveKey("fd-tareasgen",tareasGen);
+}
 function renderTareasGen(){
   const sel=document.getElementById("mt-gen-tarea-mob");if(!sel)return;
   let g=sel.querySelector("optgroup[data-propias]");
@@ -2339,6 +2353,20 @@ function renderDescuentosList(){
 
 // ── CUENTAS ──
 function setCuentasTab(tab){cuentasTab=tab;document.getElementById("cta-btn-t").className="seg-opt"+(tab==="tracto"?" on":"");document.getElementById("cta-btn-a").className="seg-opt"+(tab==="agri"?" on":"");renderCuentas();}
+// ── Oficiales de cuenta ──
+// Se cargan en la PC (Cuentas) y llegan por la nube. Acá solo se miran, y
+// tocando el teléfono se llama.
+let oficiales=(()=>{try{return JSON.parse(localStorage.getItem("ft-mob-oficiales")||"{}")||{};}catch(e){return {};}})();
+function oficialesDeBanco(banco){
+  const l=oficiales[claveLugar(banco)];
+  return Array.isArray(l)?l:[];
+}
+function htmlOficialesMob(banco){
+  // Se ven como una cuenta más del banco: chip a la izquierda, nombre a la derecha.
+  const l=oficialesDeBanco(banco).filter(o=>o&&o.nombre);
+  if(!l.length)return "";
+  return l.map(o=>`<div class="cta-row"><span class="cta-mon cta-ofi">Oficial</span><span class="cta-num" style="font-family:inherit">${o.nombre}</span></div>`).join("");
+}
 function renderCuentas(){
   const cols=["#185FA5","#1D9E75","#D85A30","#854F0B","#534AB7","#A32D2D","#085041","#0F6E56","#3C3489","#3B6D11","#0C447C","#993C1D","#415FA5","#4D9E75"];
   const E=EMPRESAS[cuentasTab]||EMPRESAS.tracto;
@@ -2354,6 +2382,7 @@ function renderCuentas(){
       <div class="banco-name">${c.b}</div>
       <div class="cta-row"><span class="cta-mon cta-gs">Gs.</span><span class="cta-num">${c.gs}</span></div>
       <div class="cta-row"><span class="cta-mon cta-usd">USD</span><span class="cta-num">${c.usd}</span></div>
+      ${htmlOficialesMob(c.b)}
     </div>`).join("");
 }
 
@@ -2571,6 +2600,7 @@ function applyRemoteChangeMob(key,value){
   else if(key==="fd-depo"){depositos=value;nDp=depositos.length?Math.max(0,...depositos.map(d=>d.id))+1:1;if(document.getElementById("depo-lista"))renderDepositosList();}
   else if(key==="fd-notas"){notasJ=value;}
   else if(key==="fd-lugares"){lugares=(value&&typeof value==="object")?value:{};migrarLugares();try{localStorage.setItem("ft-mob-lugares",JSON.stringify(lugares));}catch(e){}renderSelLugaresMob();renderLugaresMob();renderMapaMob();renderJournal();return;}
+  else if(key==="fd-oficiales"){oficiales=(value&&typeof value==="object")?value:{};try{localStorage.setItem("ft-mob-oficiales",JSON.stringify(oficiales));}catch(e){}renderCuentas();return;}
   else if(key==="fd-perfiles"){perfilesEquipo=Array.isArray(value)?value:[];try{localStorage.setItem("ft-mob-perfiles",JSON.stringify(perfilesEquipo));}catch(e){}renderPerfilMob();return;}
   else if(key==="fd-tareasgen"){tareasGen=Array.isArray(value)?value:[];try{localStorage.setItem("ft-mob-tareasgen",JSON.stringify(tareasGen));}catch(e){}renderTareasGen();return;}
   else if(key==="fd-oficina"){oficina=Object.assign({activo:false,lugar:"",inicio:null,hist:[]},value);oficinaAnchor=null;renderOficinaMob();}
@@ -2644,6 +2674,7 @@ async function ftResyncMob(){
   if(remote["fd-depo"]!=null){depositos=remote["fd-depo"];hubo=true;}
   if(remote["fd-notas"]!=null&&remote["fd-notas"]!==""){notasJ=remote["fd-notas"];hubo=true;}
   if(remote["fd-lugares"]&&typeof remote["fd-lugares"]==="object"){lugares=remote["fd-lugares"];migrarLugares();try{localStorage.setItem("ft-mob-lugares",JSON.stringify(lugares));}catch(e){}renderSelLugaresMob();renderLugaresMob();renderMapaMob();renderJournal();}
+  if(remote["fd-oficiales"]&&typeof remote["fd-oficiales"]==="object"){oficiales=remote["fd-oficiales"];try{localStorage.setItem("ft-mob-oficiales",JSON.stringify(oficiales));}catch(e){}renderCuentas();}
   if(Array.isArray(remote["fd-perfiles"])){perfilesEquipo=remote["fd-perfiles"];try{localStorage.setItem("ft-mob-perfiles",JSON.stringify(perfilesEquipo));}catch(e){}renderPerfilMob();}
   if(Array.isArray(remote["fd-tareasgen"])){tareasGen=remote["fd-tareasgen"];try{localStorage.setItem("ft-mob-tareasgen",JSON.stringify(tareasGen));}catch(e){}renderTareasGen();}
   if(remote["fd-oficina"]!=null){oficina=Object.assign({activo:false,lugar:"",inicio:null,hist:[]},remote["fd-oficina"]);oficinaAnchor=null;hubo=true;}
