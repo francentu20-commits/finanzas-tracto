@@ -138,9 +138,12 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
     <svg width="26" height="26" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#F5C200"/><circle cx="145" cy="330" r="90" fill="#1a1a1a"/><circle cx="145" cy="330" r="50" fill="#eee"/><circle cx="145" cy="330" r="22" fill="#1a1a1a"/><circle cx="355" cy="345" r="55" fill="#1a1a1a"/><circle cx="355" cy="345" r="28" fill="#eee"/><rect x="110" y="180" width="290" height="120" rx="18" fill="#1a1a1a"/><rect x="270" y="110" width="130" height="100" rx="18" fill="#1a1a1a"/><rect x="278" y="118" width="114" height="76" rx="10" fill="#a8d8f0" opacity=".85"/></svg>
     Finanzas Tracto
     <!-- Versión visible. Tiene que coincidir en la PC, en el celular y en el CACHE de sw.js del celular: si alguno dice otro número, ese equipo no tiene la última versión. Se sube junto con cada cambio. -->
-    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v77</span>
+    <span id="app-version" style="font-size:10px;font-weight:400;color:var(--tx3);margin-left:4px">v86</span>
   </div>
-  <button class="emp-switch" onclick="toggleEmp()" id="emp-btn">Tracto</button>
+  <div style="display:flex;gap:6px;align-items:center">
+    <button class="emp-switch" onclick="abrirGuia()" title="Guía de depósitos"><i class="ti ti-book"></i></button>
+    <button class="emp-switch" onclick="toggleEmp()" id="emp-btn">Tracto</button>
+  </div>
 </div>
 
 <div class="content">
@@ -331,6 +334,23 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
 
 </div>
 
+
+<!-- GUÍA DE DEPÓSITOS -->
+<div class="modal-overlay" id="modal-guia">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-book"></i> Manual</div>
+    <div id="guia-tabs-m" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      <!-- las pestañas se arman solas, según lo que tenga el manual -->
+    </div>
+    <div id="guia-pasos-m"></div>
+    <div class="card" id="guia-check-card-m" style="background:var(--bg)">
+      <div style="font-weight:800;font-size:14px;color:var(--tx);margin-bottom:6px">Qué controlar en un cheque</div>
+      <div id="guia-check-m"></div>
+    </div>
+    <button class="btn btn-cancel" onclick="cerrarGuia()">Cerrar</button>
+  </div>
+</div>
+
 <!-- VISOR DE ACUSE (pantalla completa) -->
 <div class="modal-overlay" id="modal-acuse-view" onclick="cerrarAcuseFull()" style="z-index:300;align-items:center">
   <img id="acuse-view-img" style="max-width:94vw;max-height:90vh;border-radius:10px;object-fit:contain">
@@ -461,7 +481,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--tx);overflow:hidden;h
 
 <script>
 // ── DATA ──
-const CTAS={tracto:[{b:"Itaú",gs:"00039779/3",usd:"05-001436/9"},{b:"Sudameris",gs:"10-1123363",usd:"10-1123363"},{b:"GNB",gs:"001-064104-001",usd:"001064104-020"},{b:"Atlas",gs:"1013000131",usd:"11013000440"},{b:"Continental",gs:"01-0369862-08",usd:"01-0792502-04"},{b:"Basa",gs:"021300061/3",usd:"10200000018"},{b:"Regional",gs:"8052709",usd:"8052709"},{b:"Visión",gs:"90008649/4",usd:"90043311/9"},{b:"Nac. Argentina",gs:"519162",usd:"519154"},{b:"Do Brasil",gs:"327786",usd:"10-327786"},{b:"Bancop",gs:"0.410010715",usd:"0.410010804"},{b:"Río",gs:"0823358800/07",usd:"0826848900/03"},{b:"Familiar",gs:"22-002079028",usd:"22-002079031"},{b:"Interfisa",gs:"50000926",usd:"60000257"},{b:"FIC",gs:"231000786",usd:"231000787"},{b:"Solar",gs:"187271",usd:"183216"}],agri:[{b:"Itaú",gs:"4.0.000205/7",usd:"4.5.000033/0"},{b:"Interfisa",gs:"5-0007171",usd:"6-0001192"},{b:"Familiar",gs:"22-002783107",usd:"22-002783084"},{b:"Bancop",gs:"410162752",usd:"410162760"},{b:"Atlas",gs:"1242626",usd:"1244647"},{b:"Regional",gs:"8065388",usd:"8065388"},{b:"Sudameris",gs:"10-3794476",usd:"10-3794476"},{b:"Visión",gs:"900614013",usd:"900614006"},{b:"Continental",gs:"12360317106",usd:"12631738701"},{b:"Río",gs:"82313482001",usd:"-"},{b:"FIC",gs:"631000756",usd:"631001318"},{b:"Basa",gs:"100132861",usd:"10100013846"}]};
+const CTAS={tracto:[{b:"Itaú",gs:"00039779/3",usd:"05-001436/9"},{b:"Sudameris",gs:"10-1123363",usd:"10-1123363"},{b:"GNB",gs:"001-064104-001",usd:"001064104-020"},{b:"Atlas",gs:"1013000131",usd:"11013000440"},{b:"Continental",gs:"01-0369862-08",usd:"01-0792502-04"},{b:"Basa",gs:"021300061/3",usd:"10200000018"},{b:"Ueno Bank",gs:"90008649/4",usd:"90043311/9"},{b:"Nac. Argentina",gs:"519162",usd:"519154"},{b:"Do Brasil",gs:"327786",usd:"10-327786"},{b:"Bancop",gs:"0.410010715",usd:"0.410010804"},{b:"Familiar",gs:"22-002079028",usd:"22-002079031"},{b:"Interfisa",gs:"50000926",usd:"60000257"},{b:"FIC",gs:"231000786",usd:"231000787"},{b:"Solar",gs:"187271",usd:"183216"}],agri:[{b:"Itaú",gs:"4.0.000205/7",usd:"4.5.000033/0"},{b:"Interfisa",gs:"5-0007171",usd:"6-0001192"},{b:"Familiar",gs:"22-002783107",usd:"22-002783084"},{b:"Bancop",gs:"410162752",usd:"410162760"},{b:"Atlas",gs:"1242626",usd:"1244647"},{b:"Sudameris",gs:"10-3794476",usd:"10-3794476"},{b:"Ueno Bank",gs:"900614013",usd:"900614006"},{b:"Continental",gs:"12360317106",usd:"12631738701"},{b:"FIC",gs:"631000756",usd:"631001318"},{b:"Basa",gs:"100132861",usd:"10100013846"}]};
 
 let tareas=JSON.parse(localStorage.getItem("ft-mob-tar")||"[]");
 let ops=JSON.parse(localStorage.getItem("ft-mob-ops")||"[]");
@@ -515,7 +535,7 @@ let acuseTaskId=null,acuseB64=null,acuseAgendaId=null;
 let cuentasTab="tracto";
 // Datos fiscales de cada empresa, en un solo lugar (igual que en la PC).
 const EMPRESAS={
-  tracto:{nom:"Tracto Agro Vial S.A.E.",ruc:"80027587-0"},
+  tracto:{nom:"Tracto Agro Vial S.A.",ruc:"80027587-0"},
   agri:{nom:"Agricultural Business S.R.L.",ruc:"80093150-5"}
 };
 // Estado de "De vuelta a la oficina" (se declara acá arriba, junto al resto
@@ -1072,12 +1092,34 @@ function elegirPerfilMob(){
 // cosas. Se cargan con el GPS parado en la puerta (desde el celular) y viajan
 // por la nube ("fd-lugares"), así las tienen todos. Con eso el celular ordena
 // las tareas por cercanía, eligiendo para cada una la sucursal que le sirve.
+// Bancos que cambiaron de nombre: lo que se guardó con el nombre viejo
+// (la ubicación en el mapa, el oficial) sigue a la vista con el nuevo.
+// Nombre viejo (sin tildes, en minúscula) -> nombre nuevo, tal como se muestra.
+var BANCOS_RENOMBRADOS={"vision":"Ueno Bank"};
+function renombrarClaves(obj){
+  Object.keys(obj||{}).forEach(function(k){
+    var p=k.split("|"),nuevo=BANCOS_RENOMBRADOS[p[0]];
+    if(!nuevo)return;
+    p[0]=nuevo.toLowerCase();
+    var nk=p.join("|"),v=obj[k];
+    // Lo guardado también se muestra con el nombre nuevo.
+    if(v&&typeof v==="object"&&!Array.isArray(v)&&v.banco)v.banco=nuevo;
+    if(!obj[nk])obj[nk]=v;
+    delete obj[k];
+  });
+  return obj||{};
+}
+function claveLugar(nombre){
+  var k=String(nombre||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
+  return BANCOS_RENOMBRADOS[k]?BANCOS_RENOMBRADOS[k].toLowerCase():k;
+}
 var TIPOS_LUGAR={ambos:"Depósitos y oficiales",deposito:"Solo depósitos",oficiales:"Oficiales de cuenta"};
 let lugares=(function(){try{return JSON.parse(localStorage.getItem("ft-mob-lugares")||"{}")||{};}catch(e){return {};}})();
 let miUbicacion=null;
 // Las primeras versiones guardaban un solo lugar por banco, sin sucursal ni
 // tipo. Se pasan al formato nuevo la primera vez que se abre la app.
 function migrarLugares(){
+  renombrarClaves(lugares);
   Object.keys(lugares).forEach(function(k){
     var l=lugares[k];
     if(l&&l.banco===undefined)lugares[k]={banco:l.nombre||k,sucursal:"",tipo:"ambos",lat:l.lat,lng:l.lng,precision:l.precision||0,por:l.por||"",ts:l.ts||Date.now()};
@@ -1087,9 +1129,6 @@ migrarLugares();
 function guardarLugares(){
   try{localStorage.setItem("ft-mob-lugares",JSON.stringify(lugares));}catch(e){}
   if(window.FDSupabase&&window.FDSupabase.estaListoParaEscribir())window.FDSupabase.saveKey("fd-lugares",lugares);
-}
-function claveLugar(nombre){
-  return String(nombre||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
 }
 // Cada sucursal tiene su propia clave: "atlas" y "atlas|centro" conviven.
 function idLugar(banco,sucursal){
@@ -1375,10 +1414,46 @@ let timerUbic=null,ultimaMarcaUbic="",lockPantalla=null;
 function hayTareaEnCurso(){
   return tareas.filter(function(x){return x.st==="en_camino"||x.st==="en_banco";})[0]||null;
 }
-function mandarUbicacion(){
+// ── Seguimiento con la pantalla apagada ──
+// Dentro del APK hay un servicio de Android que sigue leyendo el GPS aunque la
+// pantalla esté apagada o la app cerrada. Android exige una notificación
+// permanente mientras eso corre; sin esa notificación el sistema corta el GPS.
+// En el navegador común esto no existe y se sigue usando el reloj de siempre.
+let idSeguimientoFondo=null;
+function pluginFondo(){
+  return window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.BackgroundGeolocation;
+}
+function seguimientoFondo(prender){
+  var P=pluginFondo();
+  if(!P)return false;
+  if(prender&&idSeguimientoFondo===null){
+    idSeguimientoFondo="pidiendo";
+    P.addWatcher({
+      backgroundMessage:"Tocá para volver a la app.",
+      backgroundTitle:"Finanzas Tracto en funcionamiento",
+      requestPermissions:true,
+      stale:false,
+      distanceFilter:25
+    },function(pos,err){
+      if(err){
+        if(err.code==="NOT_AUTHORIZED")toast("Para que ande con la pantalla apagada hay que permitir la ubicación «todo el tiempo»","#A32D2D");
+        return;
+      }
+      if(!pos||pos.latitude==null)return;
+      mandarUbicacion({lat:pos.latitude,lng:pos.longitude,precision:Math.round(pos.accuracy||0)});
+    }).then(function(id){idSeguimientoFondo=id;}).catch(function(){idSeguimientoFondo=null;});
+    return true;
+  }
+  if(!prender&&idSeguimientoFondo&&idSeguimientoFondo!=="pidiendo"){
+    P.removeWatcher({id:idSeguimientoFondo}).catch(function(){});
+    idSeguimientoFondo=null;
+  }
+  return true;
+}
+function mandarUbicacion(yaLeida){
   if(!miPerfilMob.nombre)return;
   var t=hayTareaEnCurso();
-  pedirMiUbicacion(function(u){
+  var conLaPosicion=function(u){
     // Se avisa también a qué sucursal va, para que la PC marque exactamente
     // la misma y no otra del mismo banco.
     var dest=t?lugarParaTarea(t):null;
@@ -1390,7 +1465,9 @@ function mandarUbicacion(){
       fase:t?(t.st==="en_banco"?"en el banco":"en camino"):"con la app abierta"
     });
     renderMapaMob();
-  },function(){});
+  };
+  if(yaLeida&&yaLeida.lat!=null){anotarUbicacion({latitude:yaLeida.lat,longitude:yaLeida.lng,accuracy:yaLeida.precision});conLaPosicion(yaLeida);return;}
+  pedirMiUbicacion(conLaPosicion,function(){});
 }
 // Mantiene la pantalla encendida mientras dura la tarea, para que el envío no
 // se corte. Si el teléfono no lo permite, sigue andando igual.
@@ -1408,9 +1485,11 @@ function actualizarCompartirUbicacion(){
   var debe=!!miPerfilMob.nombre;
   if(debe&&!timerUbic){
     mandarUbicacion();
-    timerUbic=setInterval(mandarUbicacion,45000);
+    timerUbic=setInterval(function(){mandarUbicacion();},45000);
+    seguimientoFondo(true);   // en el APK, sigue con la pantalla apagada
   }else if(!debe&&timerUbic){
     clearInterval(timerUbic);timerUbic=null;
+    seguimientoFondo(false);
     if(window.FDSupabase)window.FDSupabase.broadcastEvent({tipo:"ubicacion_fin",nombre:ultimaMarcaUbic.split("|")[0]||""});
   }
   var t=hayTareaEnCurso();
@@ -2356,16 +2435,219 @@ function setCuentasTab(tab){cuentasTab=tab;document.getElementById("cta-btn-t").
 // ── Oficiales de cuenta ──
 // Se cargan en la PC (Cuentas) y llegan por la nube. Acá solo se miran, y
 // tocando el teléfono se llama.
-let oficiales=(()=>{try{return JSON.parse(localStorage.getItem("ft-mob-oficiales")||"{}")||{};}catch(e){return {};}})();
+const ROLES_BANCO=["Oficial","Asistente"];
+let oficiales=renombrarClaves((()=>{try{return JSON.parse(localStorage.getItem("ft-mob-oficiales")||"{}")||{};}catch(e){return {};}})());
 function oficialesDeBanco(banco){
   const l=oficiales[claveLugar(banco)];
   return Array.isArray(l)?l:[];
 }
 function htmlOficialesMob(banco){
-  // Se ven como una cuenta más del banco: chip a la izquierda, nombre a la derecha.
-  const l=oficialesDeBanco(banco).filter(o=>o&&o.nombre);
-  if(!l.length)return "";
-  return l.map(o=>`<div class="cta-row"><span class="cta-mon cta-ofi">Oficial</span><span class="cta-num" style="font-family:inherit">${o.nombre}</span></div>`).join("");
+  // Se ven como una cuenta más del banco: el primero es el oficial de cuenta
+  // y el segundo su asistente.
+  const l=oficialesDeBanco(banco);
+  return ROLES_BANCO.map((rol,k)=>{
+    const o=l[k];
+    if(!o||!o.nombre)return "";
+    return `<div class="cta-row"><span class="cta-mon cta-ofi">${rol}</span><span class="cta-num" style="font-family:inherit">${o.nombre}</span></div>`;
+  }).join("");
+}
+// ── Guía de depósitos ──
+// El paso a paso del trabajo de verdad: qué se revisa en tesorería, cómo se
+// anota, cómo se endosa y qué se hace en la ventanilla. Es para leer: lo único
+// que se guarda son los tildes del checklist, y quedan en este equipo.
+var PASOS_DEPOSITO=[
+ {t:"Revisar los cheques en tesorería",i:"ti-checkbox",p:[
+  "Contá los cheques y comparalos con la lista que te da tesorería: la cantidad y el total tienen que dar igual.",
+  "De cada cheque mirá: a nombre de quién está, importe en números y en letras, banco, fecha y firma del librador.",
+  "Que no tenga enmiendas ni roturas sobre los datos."],
+  nota:"Si algo no coincide se aclara ahí mismo: de tesorería no se sale con una diferencia."},
+ {t:"Separar en grupos: una boleta por grupo",i:"ti-arrows-split",p:[
+  "Primero definí en qué banco vas a depositar. Puede ser Itaú, Atlas o el que sea: el banco cambia, la regla es la misma.",
+  "En ese banco van dos boletas: una con los cheques del banco de depósito y otra con los cheques de otros bancos.",
+  "Los cheques en dólares van en su propia boleta y a la cuenta en USD; los de guaraníes en la suya y a la cuenta en guaraníes.",
+  "Los cheques de Agricultural (Agrisa) van en boleta aparte y a la cuenta de Agrisa."],
+  nota:"Ejemplo: si depositás en Atlas, una boleta con cheques Atlas y otra con los de otros bancos. En una misma boleta nunca se mezclan bancos, empresas ni monedas."},
+ {t:"Efectivo: guaraníes y dólares",i:"ti-cash",p:[
+  "Con el efectivo es el mismo proceso que con los cheques, con una diferencia: el conteo es a mano, billete por billete, y tiene que dar el total que te pasan.",
+  "Tesorería te dice de qué empresa es cada monto, Tracto o Agricultural, tanto en guaraníes como en dólares.",
+  "Cada empresa y cada moneda van por separado, con su boleta y a su cuenta.",
+  "Los dólares en efectivo se depositan en Ueno Bank."]},
+ {t:"Hacer las boletas y armar la ruta, antes de salir",i:"ti-clipboard-list",p:[
+  "Cargá los cheques en el Excel y después en la boleta, y compará que coincidan: así se descarta cualquier error. La suma que vale es la del Excel.",
+  "En cada boleta va: cuenta, empresa, fecha, cantidad de cheques, el detalle de cada cheque (banco, número e importe) y el total.",
+  "En Itaú el depósito se hace por el taucher: no va boleta, pero sí una nota escrita con el total de los cheques del banco de depósito, el total de los de otros bancos y el número de cuenta donde se deposita.",
+  "Armá la ruta: en qué orden vas a los bancos. Cargá las tareas en la app y te las ordena por cercanía."],
+  nota:"Una boleta por grupo: la del banco de depósito, la de otros bancos, la de USD y la de Agrisa si las hay."},
+ {t:"Endosar cada cheque",i:"ti-stamp",p:[
+  "Leé el nombre del beneficiario en el cheque: no siempre dice lo mismo.",
+  "Sellá con el sello que diga lo mismo que el cheque. Por ejemplo: si dice solo «Tracto» va el sello de Tracto solo, y si dice «Tracto Agro Vial S.A.» va ese. Lo que manda es el nombre impreso en el cheque.",
+  "Después poné el sello del número de cuenta donde se deposita: el de la cuenta de ese grupo, empresa y moneda.",
+  "Firmá."],
+  nota:"Los sellos van al dorso, legibles y sin tapar los datos del cheque. Un sello de cuenta equivocado manda la plata a otra cuenta."},
+ {t:"En el banco",i:"ti-building-bank",p:[
+  "Entregá cada boleta con su grupo de cheques: la del banco de depósito por un lado y la de otros bancos por otro.",
+  "En Itaú va por el taucher, con la nota escrita y los cheques.",
+  "La firma del endoso y la de la boleta tienen que ser de la persona que va a depositar.",
+  "Antes de entregar, contá los cheques otra vez y fijate que el total de la boleta sea el que anotaste y que la cuenta escrita sea la del grupo."]},
+ {t:"El comprobante",i:"ti-receipt",p:[
+  "Pedí el comprobante con el sello del banco.",
+  "Guardalo: va para tesorería."]},
+ {t:"Al volver a la oficina",i:"ti-circle-check",p:[
+  "Entregá el comprobante y marcá la tarea como terminada en la app.",
+  "Si quedó algún cheque sin depositar, anotalo y avisá en el día."]}
+];
+// Entrega de documentos: solicitudes de préstamo, venta de cartera y demás
+// papeles que hay que presentar firmados, y el retiro de pagarés o de cheques
+// rechazados, que lleva un permiso más corto.
+var PASOS_DOCUMENTOS=[
+ {t:"Recibir los documentos",i:"ti-file-text",p:[
+  "La jefa te entrega los documentos a presentar: en general solicitudes de préstamo o de venta de cartera.",
+  "Fijate que estén completos y que tengas la copia que vas a usar para el acuse."]},
+ {t:"Juntar las firmas",i:"ti-writing-sign",p:[
+  "Hacé firmar a todos los directores.",
+  "No se lleva al banco hasta tener todas las firmas."]},
+ {t:"Presentar en el banco",i:"ti-building-bank",p:[
+  "Los documentos se entregan junto al oficial de cuentas del banco.",
+  "Ahí los reciben y los controlan.",
+  "Hacé sellar la copia que llevaste: ese es el acuse."],
+  nota:"Sin acuse no hay constancia de que el banco lo recibió."},
+ {t:"Retiro de pagarés o cheques rechazados",i:"ti-file-download",p:[
+  "Es parecido, pero la solicitud lleva solo la firma del presidente.",
+  "Con la solicitud firmada hay dos caminos: ir con el oficial de cuenta y retirarlo en el día, o dejar la solicitud y retirarlo al día siguiente. Depende del banco.",
+  "Si solo dejás la solicitud, pedí acuse sí o sí."]},
+ {t:"Al volver a la oficina",i:"ti-circle-check",p:[
+  "Entregá los acuses y marcá la tarea como terminada en la app.",
+  "Si algo quedó para el día siguiente, dejalo anotado."]}
+];
+// Retirar efectivo: se libra un cheque propio, lo firma el presidente y se
+// cobra en el banco que lo emitió.
+var PASOS_RETIRO=[
+ {t:"Hacer el cheque",i:"ti-pencil",p:[
+  "Preguntá bien qué te piden: a nombre de quién va el cheque, de qué empresa y de qué banco se saca. Eso cambia en cada pedido.",
+  "Completalo con la fecha, el beneficiario, el importe en números y el importe en letras.",
+  "Revisá que los dos importes digan lo mismo y que no quede ningún espacio en blanco donde se pueda agregar algo."]},
+ {t:"Hacer firmar al presidente",i:"ti-writing-sign",p:[
+  "El cheque lo firma el presidente.",
+  "Sin esa firma no se retira nada."]},
+ {t:"Retirar en el banco",i:"ti-building-bank",p:[
+  "El retiro se hace en el banco que emitió el cheque, no en otro.",
+  "Contá la plata en la ventanilla, antes de salir."]},
+ {t:"Entregar a tesorería",i:"ti-cash",p:[
+  "Entregá el efectivo a tesorería y que quede constancia de la entrega.",
+  "Marcá la tarea como terminada en la app."]}
+];
+var GUIAS={depositos:{nom:"Depósitos",pasos:PASOS_DEPOSITO},
+           retiro:{nom:"Retirar efectivo",pasos:PASOS_RETIRO,img:"plano-completar.jpg",
+                   txtImg:"Así se completa el cheque. Tocá la imagen para verla en grande."},
+           carga:{nom:"Cómo cargar los cheques",img:"plano-cheque.jpg",
+                  txtImg:"Dónde va cada dato del cheque en la planilla. Tocá la imagen para verla en grande."},
+           documentos:{nom:"Entrega de documentos",pasos:PASOS_DOCUMENTOS},
+           control:{nom:"Control de cheques"},
+           hub:{nom:"Hub"}};
+var guiaActiva="depositos";
+// El checklist controla el cheque en sí, antes de salir. El resto del proceso
+// está en los pasos de arriba.
+var CHECK_DEPOSITO=[
+ {g:"En todo cheque",items:[
+  "Tiene que estar a nombre de la empresa que corresponde: Tracto o Agricultural.",
+  "El importe en números tiene que decir lo mismo que el importe en letras.",
+  "Sin la firma del librador el cheque no vale.",
+  "Un cheque con tachaduras o enmiendas sobre los datos no se recibe.",
+  "Si viene endosado por otra persona, la cadena de endosos tiene que estar completa y legible."]},
+ {g:"Si es a la vista",items:[
+  "El cheque dice VISTA impreso, arriba del todo.",
+  "Trae una sola fecha.",
+  "Se deposita desde ese día y hasta 30 días después de la emisión. Pasado ese plazo, vence."]},
+ {g:"Si es diferido",items:[
+  "El cheque dice DIFERIDO impreso. Si no lo dice, no es diferido por más que le pongan dos fechas.",
+  "Trae dos fechas, la de emisión y la de pago, y entre una y otra no puede haber más de 180 días.",
+  "Antes de la fecha de pago no se puede depositar. Desde esa fecha hay 30 días para presentarlo.",
+  "Se guarda hasta la fecha de pago. En la planilla, esa fecha va en vencimiento."]},
+ {g:"Control de lista de tesorería",items:[
+  "De cada cheque, el número, el banco, el importe y la fecha tienen que decir lo mismo que la lista.",
+  "La cantidad de cheques y el total tienen que dar igual.",
+  "Si algo no coincide, se aclara en tesorería antes de salir."]}
+];
+// El manual que armaron en la PC, si lo hay; si no, el de fábrica.
+function manualDatos(){ var m=(hub&&hub.manual)||{}; return {guias:m.guias||{},orden:m.orden||[],borradas:m.borradas||[]}; }
+function manualGuia(k){ var m=manualDatos(); return m.guias[k]||GUIAS[k]||{nom:k,pasos:[]}; }
+function manualClaves(){
+  var m=manualDatos(),base=["depositos","retiro","carga","documentos","control"];
+  var todas=base.concat(m.orden.filter(function(k){return base.indexOf(k)<0;}));
+  return todas.filter(function(k){return m.borradas.indexOf(k)<0;}).concat(["hub"]);
+}
+function renderGuia(){
+  var cont=document.getElementById("guia-pasos-m");
+  if(!cont)return;
+  var tabs=document.getElementById("guia-tabs-m");
+  if(tabs){
+    tabs.innerHTML=manualClaves().map(function(k){
+      var on=(k===guiaActiva),nom=(k==="hub")?"Hub":manualGuia(k).nom;
+      return '<button class="btn" style="font-size:13px;padding:9px;width:auto;flex:1 1 45%;background:'+(on?"#F5C200":"transparent")
+        +';color:'+(on?"#1a1a1a":"var(--tx2)")+';border:1px solid '+(on?"#F5C200":"var(--bd)")+'" onclick="verGuia(\''+k+'\')">'+nom+'</button>';
+    }).join("");
+  }
+  // La pestaña de control no tiene pasos (muestra la lista sola) y la del
+  // plano muestra la lámina del cheque en vez de los pasos.
+  var gu=manualGuia(guiaActiva);
+  cont.style.display=(gu.pasos||gu.img)?"":"none";
+  if(guiaActiva==="hub"){cont.style.display="";cont.innerHTML=htmlHubMob();
+      var cch=document.getElementById("guia-check-card-m");if(cch)cch.style.display="none";
+    return;}
+  cont.innerHTML=(gu.pasos||[]).map(function(s,k){
+    return '<div class="card" style="margin-bottom:.6rem"><div style="display:flex;gap:10px;align-items:flex-start">'
+      +'<span style="flex:none;width:26px;height:26px;border-radius:50%;background:#F5C200;color:#1a1a1a;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center">'+(k+1)+'</span>'
+      +'<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14px;color:var(--tx);margin-bottom:.35rem"><i class="ti '+s.i+'"></i> '+s.t+'</div>'
+      +'<ul style="margin:0;padding-left:17px;font-size:13px;color:var(--tx2);line-height:1.65">'+s.p.map(function(x){return '<li>'+x+'</li>';}).join("")+'</ul>'
+      +(s.nota?[].concat(s.nota).map(function(nt){return '<div style="margin-top:.5rem;background:var(--al);color:var(--amber);border-radius:8px;padding:.45rem .6rem;font-size:12px;font-weight:600">'+nt+'</div>';}).join(""):"")
+      +'</div></div></div>';
+  }).join("")
+  +(gu.img?('<div class="card"><div style="font-size:13px;color:var(--tx2);margin-bottom:.6rem">'
+    +(gu.txtImg||"Tocá la imagen para verla en grande.")+'</div>'
+    +'<img src="'+gu.img+'" style="width:100%;border-radius:10px;border:1px solid var(--bd);cursor:zoom-in" onclick="verPlanoGrande(this.src)"></div>'):"");
+  var cc=document.getElementById("guia-check-card-m");
+  if(cc)cc.style.display=(guiaActiva==="control")?"":"none";
+  renderChecklistGuia();
+}
+function verGuia(k){guiaActiva=k;renderGuia();}
+function verPlanoGrande(src){
+  var d=document.getElementById("fd-plano-full");
+  if(!d){
+    d=document.createElement("div");
+    d.id="fd-plano-full";
+    d.style.cssText="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.88);align-items:center;justify-content:center;cursor:zoom-out;overflow:auto;padding:14px";
+    d.onclick=function(){d.style.display="none";};
+    d.innerHTML='<img style="max-width:none;width:1600px;max-height:none;border-radius:8px">';
+    document.body.appendChild(d);
+  }
+  d.querySelector("img").src=src;
+  d.style.display="flex";
+}
+function renderChecklistGuia(){
+  var cont=document.getElementById("guia-check-m");
+  if(!cont)return;
+  var html="";
+  CHECK_DEPOSITO.forEach(function(gr,gi){
+    html+='<div style="font-size:11px;font-weight:800;color:var(--tx3);text-transform:uppercase;letter-spacing:.4px;margin:'+(gi?".9rem":"0")+' 0 .3rem">'+gr.g+'</div>';
+    gr.items.forEach(function(x){
+      html+='<div style="display:flex;gap:8px;align-items:flex-start;padding:.26rem 0;font-size:13px;color:var(--tx2);line-height:1.5">'
+        +'<span style="color:#F5C200;font-weight:900">•</span><span>'+x+'</span></div>';
+    });
+  });
+  cont.innerHTML=html;
+}
+function abrirGuia(){renderGuia();document.getElementById("modal-guia").classList.add("open");}
+function cerrarGuia(){document.getElementById("modal-guia").classList.remove("open");}
+// ── HUB ──
+// Las fichas se arman en la PC; acá se miran nomás.
+let hub=(()=>{try{const h=JSON.parse(localStorage.getItem("ft-mob-hub")||"null");return (h&&Array.isArray(h.fichas))?h:{fichas:[]};}catch(e){return {fichas:[]};}})();
+function htmlHubMob(){
+  if(!hub.fichas.length)return '<div class="card" style="text-align:center;color:var(--tx2);font-size:13px">Todavía no hay fichas. Se arman desde la PC.</div>';
+  return hub.fichas.map(f=>'<div class="card" style="border-left:4px solid '+f.color+'">'
+    +'<div style="font-weight:800;font-size:14px;color:var(--tx);margin-bottom:6px">'+f.t+'</div>'
+    +(f.l||[]).map(x=>'<div style="display:flex;gap:7px;align-items:flex-start;padding:2px 0;font-size:13px;color:var(--tx2);line-height:1.5">'
+      +'<span style="color:'+f.color+';font-weight:900">•</span><span>'+x+'</span></div>').join("")
+    +'</div>').join("");
 }
 function renderCuentas(){
   const cols=["#185FA5","#1D9E75","#D85A30","#854F0B","#534AB7","#A32D2D","#085041","#0F6E56","#3C3489","#3B6D11","#0C447C","#993C1D","#415FA5","#4D9E75"];
@@ -2600,7 +2882,8 @@ function applyRemoteChangeMob(key,value){
   else if(key==="fd-depo"){depositos=value;nDp=depositos.length?Math.max(0,...depositos.map(d=>d.id))+1:1;if(document.getElementById("depo-lista"))renderDepositosList();}
   else if(key==="fd-notas"){notasJ=value;}
   else if(key==="fd-lugares"){lugares=(value&&typeof value==="object")?value:{};migrarLugares();try{localStorage.setItem("ft-mob-lugares",JSON.stringify(lugares));}catch(e){}renderSelLugaresMob();renderLugaresMob();renderMapaMob();renderJournal();return;}
-  else if(key==="fd-oficiales"){oficiales=(value&&typeof value==="object")?value:{};try{localStorage.setItem("ft-mob-oficiales",JSON.stringify(oficiales));}catch(e){}renderCuentas();return;}
+  else if(key==="fd-hub"){hub=(value&&value.fichas)?value:{fichas:[]};try{localStorage.setItem("ft-mob-hub",JSON.stringify(hub));}catch(e){}if(typeof renderGuia==="function"&&guiaActiva==="hub")renderGuia();return;}
+  else if(key==="fd-oficiales"){oficiales=renombrarClaves((value&&typeof value==="object")?value:{});try{localStorage.setItem("ft-mob-oficiales",JSON.stringify(oficiales));}catch(e){}renderCuentas();return;}
   else if(key==="fd-perfiles"){perfilesEquipo=Array.isArray(value)?value:[];try{localStorage.setItem("ft-mob-perfiles",JSON.stringify(perfilesEquipo));}catch(e){}renderPerfilMob();return;}
   else if(key==="fd-tareasgen"){tareasGen=Array.isArray(value)?value:[];try{localStorage.setItem("ft-mob-tareasgen",JSON.stringify(tareasGen));}catch(e){}renderTareasGen();return;}
   else if(key==="fd-oficina"){oficina=Object.assign({activo:false,lugar:"",inicio:null,hist:[]},value);oficinaAnchor=null;renderOficinaMob();}
@@ -2674,7 +2957,8 @@ async function ftResyncMob(){
   if(remote["fd-depo"]!=null){depositos=remote["fd-depo"];hubo=true;}
   if(remote["fd-notas"]!=null&&remote["fd-notas"]!==""){notasJ=remote["fd-notas"];hubo=true;}
   if(remote["fd-lugares"]&&typeof remote["fd-lugares"]==="object"){lugares=remote["fd-lugares"];migrarLugares();try{localStorage.setItem("ft-mob-lugares",JSON.stringify(lugares));}catch(e){}renderSelLugaresMob();renderLugaresMob();renderMapaMob();renderJournal();}
-  if(remote["fd-oficiales"]&&typeof remote["fd-oficiales"]==="object"){oficiales=remote["fd-oficiales"];try{localStorage.setItem("ft-mob-oficiales",JSON.stringify(oficiales));}catch(e){}renderCuentas();}
+  if(remote["fd-hub"]&&remote["fd-hub"].fichas){hub=remote["fd-hub"];try{localStorage.setItem("ft-mob-hub",JSON.stringify(hub));}catch(e){}}
+  if(remote["fd-oficiales"]&&typeof remote["fd-oficiales"]==="object"){oficiales=renombrarClaves(remote["fd-oficiales"]);try{localStorage.setItem("ft-mob-oficiales",JSON.stringify(oficiales));}catch(e){}renderCuentas();}
   if(Array.isArray(remote["fd-perfiles"])){perfilesEquipo=remote["fd-perfiles"];try{localStorage.setItem("ft-mob-perfiles",JSON.stringify(perfilesEquipo));}catch(e){}renderPerfilMob();}
   if(Array.isArray(remote["fd-tareasgen"])){tareasGen=remote["fd-tareasgen"];try{localStorage.setItem("ft-mob-tareasgen",JSON.stringify(tareasGen));}catch(e){}renderTareasGen();}
   if(remote["fd-oficina"]!=null){oficina=Object.assign({activo:false,lugar:"",inicio:null,hist:[]},remote["fd-oficina"]);oficinaAnchor=null;hubo=true;}
